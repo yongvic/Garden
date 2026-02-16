@@ -1,0 +1,257 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Auth.js required tables
+model User {
+  id                    String       @id @default(cuid())
+  name                  String?
+  email                 String?      @unique
+  emailVerified         DateTime?
+  image                 String?
+  password              String?      // for custom auth
+  role                  Role         @default(CUSTOMER)
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+
+  // Relations
+  accounts              Account[]
+  sessions              Session[]
+  listings              Listing[]
+  bookings              Booking[]
+  reviews               Review[]
+  damageClaims          DamageClaim[]
+  notifications         Notification[]
+
+  @@index([email])
+}
+
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?  @db.Text
+  access_token       String?  @db.Text
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?  @db.Text
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// Domain Models
+enum Role {
+  CUSTOMER
+  LANDLORD
+  ADMIN
+}
+
+enum ListingType {
+  ROOM
+  EQUIPMENT
+  SPACE
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum DamageStatus {
+  REPORTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  SETTLED
+}
+
+model Listing {
+  id                  String       @id @default(cuid())
+  title               String
+  description         String       @db.Text
+  type                ListingType
+  location            String
+  latitude            Float?
+  longitude           Float?
+  pricePerDay         Float        // In cents to avoid floating point issues
+  maxOccupants        Int?
+  amenities           String[]     @default([])
+  images              String[]     @default([])
+  rules               String?      @db.Text
+  cancellationPolicy  String?      @db.Text
+  
+  landlordId          String
+  landlord            User         @relation(fields: [landlordId], references: [id], onDelete: Cascade)
+  
+  isActive            Boolean      @default(true)
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  // Relations
+  bookings            Booking[]
+  reviews             Review[]
+  unavailableDates    UnavailableDate[]
+
+  @@index([landlordId])
+  @@index([type])
+  @@index([isActive])
+}
+
+model UnavailableDate {
+  id          String   @id @default(cuid())
+  listingId   String
+  date        DateTime
+  reason      String?
+  
+  listing     Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@unique([listingId, date])
+  @@index([listingId])
+  @@index([date])
+}
+
+model Booking {
+  id                  String         @id @default(cuid())
+  bookingNumber       String         @unique @default(cuid()) // User-friendly booking reference
+  
+  listingId           String
+  listing             Listing        @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  
+  customerId          String
+  customer            User           @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  
+  checkInDate         DateTime
+  checkOutDate        DateTime
+  numberOfGuests      Int
+  specialRequests     String?        @db.Text
+  
+  status              BookingStatus  @default(PENDING)
+  totalPrice          Float          // Stored in cents
+  depositAmount       Float?         // Stored in cents
+  
+  paymentId           String?        // Stripe payment intent ID
+  paymentStatus       String         @default("pending")
+  
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  // Relations
+  damageClaims        DamageClaim[]
+  notifications       Notification[]
+
+  @@unique([listingId, checkInDate, checkOutDate])
+  @@index([customerId])
+  @@index([listingId])
+  @@index([status])
+  @@index([checkInDate])
+  @@index([checkOutDate])
+}
+
+model Review {
+  id          String   @id @default(cuid())
+  
+  listingId   String
+  listing     Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  rating      Int      // 1-5
+  title       String
+  comment     String   @db.Text
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([listingId, userId])
+  @@index([listingId])
+  @@index([userId])
+}
+
+model DamageClaim {
+  id              String       @id @default(cuid())
+  claimNumber     String       @unique @default(cuid())
+  
+  bookingId       String
+  booking         Booking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  
+  reportedBy      String
+  reportedByUser  User         @relation(fields: [reportedBy], references: [id], onDelete: Cascade)
+  
+  description     String       @db.Text
+  images          String[]     @default([])
+  estimatedCost   Float?       // Stored in cents
+  
+  status          DamageStatus @default(REPORTED)
+  
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([bookingId])
+  @@index([reportedBy])
+  @@index([status])
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  bookingId   String?
+  booking     Booking? @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  
+  type        String   // "booking_confirmed", "damage_reported", etc.
+  title       String
+  message     String   @db.Text
+  isRead      Boolean  @default(false)
+  
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+model StripeCustomer {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  stripeId    String   @unique
+  createdAt   DateTime @default(now())
+}
