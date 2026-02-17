@@ -45,8 +45,8 @@ export default function AdminListingsPage() {
     return (
         <>
             <Navbar />
-            <main className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 pt-20">
-                <div className="max-w-7xl mx-auto px-4 py-12">
+            <main className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 pt-20 sm:pt-24">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-12">
 
                     <div className="flex justify-between items-center mb-8">
                         <div>
@@ -93,8 +93,8 @@ export default function AdminListingsPage() {
                                                 <td className="px-6 py-4 text-white font-medium">{listing.title}</td>
                                                 <td className="px-6 py-4">
                                                     <span className={`text-xs px-2 py-1 rounded border ${listing.type === 'ROOM' ? 'border-blue-500/50 text-blue-300 bg-blue-500/10' :
-                                                            listing.type === 'EQUIPMENT' ? 'border-purple-500/50 text-purple-300 bg-purple-500/10' :
-                                                                'border-green-500/50 text-green-300 bg-green-500/10'
+                                                        listing.type === 'EQUIPMENT' ? 'border-purple-500/50 text-purple-300 bg-purple-500/10' :
+                                                            'border-green-500/50 text-green-300 bg-green-500/10'
                                                         }`}>
                                                         {listing.type === 'ROOM' ? 'Chambre' : listing.type === 'EQUIPMENT' ? 'Équipement' : 'Espace'}
                                                     </span>

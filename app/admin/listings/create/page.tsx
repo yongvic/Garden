@@ -86,19 +86,19 @@ export default function AdminCreateListingPage() {
     return (
         <>
             <Navbar />
-            <main className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 pt-20">
-                <div className="max-w-4xl mx-auto px-4 py-12">
+            <main className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 pt-20 sm:pt-24">
+                <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-12">
 
-                    <div className="mb-8">
-                        <Link href="/admin/listings" className="text-blue-300 hover:text-white flex items-center gap-2 mb-4 transition-colors">
+                    <div className="mb-6 sm:mb-8">
+                        <Link href="/admin/listings" className="text-blue-300 hover:text-white flex items-center gap-2 mb-4 transition-colors text-sm sm:text-base">
                             <ArrowLeft className="w-4 h-4" />
                             Retour à la liste
                         </Link>
-                        <h1 className="text-3xl font-bold text-white">Ajouter une Nouvelle Annonce</h1>
-                        <p className="text-blue-100/70">Créez un nouvel espace ou matériel</p>
+                        <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">Ajouter une Nouvelle Annonce</h1>
+                        <p className="text-blue-100/70 text-sm sm:text-base">Créez un nouvel espace ou matériel</p>
                     </div>
 
-                    <Card className="backdrop-blur-md bg-white/10 border border-white/20 p-8">
+                    <Card className="backdrop-blur-md bg-white/10 border border-white/20 p-4 sm:p-6 lg:p-8">
                         <form onSubmit={handleSubmit} className="space-y-6">
                             {error && (
                                 <div className="bg-red-500/20 border border-red-500/50 rounded p-4 text-red-200">
@@ -228,11 +228,11 @@ export default function AdminCreateListingPage() {
                                 </Button>
                             </div>
 
-                            <div className="pt-4 flex justify-end">
+                            <div className="pt-4 flex flex-col sm:flex-row justify-end gap-3">
                                 <Button
                                     type="submit"
                                     disabled={isLoading}
-                                    className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white px-8 py-2"
+                                    className="w-full sm:w-auto bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white px-8 py-3 h-12"
                                 >
                                     {isLoading ? 'Création...' : 'Créer l\'Annonce'}
                                 </Button>
