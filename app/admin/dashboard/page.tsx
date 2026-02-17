@@ -159,12 +159,23 @@ export default function AdminDashboard() {
                       </div>
                       {action.icon}
                     </div>
-                    <Button
-                      className={`bg-gradient-to-r ${action.color} to-transparent text-white text-sm w-full`}
-                      onClick={() => { }}
-                    >
-                      Gérer →
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        className={`bg-gradient-to-r ${action.color} to-transparent text-white text-sm flex-1`}
+                        onClick={() => { }}
+                      >
+                        Gérer →
+                      </Button>
+                      {action.href === '/admin/listings' && (
+                        <Link href="/admin/listings/create" onClick={(e) => e.stopPropagation()}>
+                          <Button
+                            className="bg-gradient-to-r from-green-500 to-emerald-500 text-white text-sm"
+                          >
+                            + Ajouter
+                          </Button>
+                        </Link>
+                      )}
+                    </div>
                   </Card>
                 </Link>
               ))}
