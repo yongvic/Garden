@@ -32,17 +32,17 @@ export default function RegisterPage() {
 
     // Validation
     if (!name.trim()) {
-      setError('Name is required')
+      setError('Le nom est requis')
       return
     }
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match')
+      setError('Les mots de passe ne correspondent pas')
       return
     }
 
     if (password.length < 8) {
-      setError('Password must be at least 8 characters')
+      setError('Le mot de passe doit contenir au moins 8 caractères')
       return
     }
 
@@ -64,7 +64,7 @@ export default function RegisterPage() {
 
       if (!res.ok) {
         const data = await res.json()
-        setError(data.error || 'Registration failed')
+        setError(data.error || 'L\'inscription a échoué')
         return
       }
 
@@ -78,13 +78,13 @@ export default function RegisterPage() {
       if (signInResult?.ok) {
         router.push('/dashboard')
       } else {
-        setError('Registration successful! Please sign in.')
+        setError('Inscription réussie ! Veuillez vous connecter.')
         setTimeout(() => {
           router.push('/auth/signin')
         }, 2000)
       }
     } catch (err) {
-      setError('An error occurred. Please try again.')
+      setError('Une erreur est survenue. Veuillez réessayer.')
     } finally {
       setIsLoading(false)
     }
@@ -94,51 +94,51 @@ export default function RegisterPage() {
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center p-4">
       {/* Glassmorphism background elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-20 left-20 w-72 h-72 bg-blue-500/10 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-20 right-20 w-72 h-72 bg-cyan-500/10 rounded-full blur-3xl"></div>
+        <div className="absolute top-20 left-20 w-72 h-72 bg-blue-500/10 rounded-full blur-3xl animate-pulse duration-[4000ms]"></div>
+        <div className="absolute bottom-20 right-20 w-72 h-72 bg-cyan-500/10 rounded-full blur-3xl animate-pulse duration-[5000ms]"></div>
       </div>
 
-      <Card className="relative w-full max-w-md backdrop-blur-md bg-white/10 border border-white/20 shadow-2xl">
+      <Card className="relative w-full max-w-md backdrop-blur-xl bg-white/10 border border-white/20 shadow-2xl animate-in fade-in zoom-in duration-500">
         <div className="p-8">
           {step === 'role' ? (
             <>
-              <div className="mb-8">
-                <h1 className="text-3xl font-bold text-white mb-2">Get Started</h1>
-                <p className="text-blue-100/70">Choose your account type</p>
+              <div className="mb-8 text-center">
+                <h1 className="text-3xl font-bold text-white mb-2">Commencer</h1>
+                <p className="text-blue-100/70">Choisissez votre type de compte</p>
               </div>
 
               <div className="space-y-4">
                 <button
                   onClick={() => handleRoleSelect('CUSTOMER')}
-                  className="w-full p-6 text-left rounded-lg border-2 border-white/20 hover:border-blue-400/50 hover:bg-white/5 transition-all group"
+                  className="w-full p-6 text-left rounded-lg border-2 border-white/20 hover:border-blue-400/50 hover:bg-white/5 transition-all group animate-in fade-in slide-in-from-left duration-300 delay-100"
                 >
                   <div className="flex items-start justify-between">
                     <div>
-                      <h3 className="text-lg font-semibold text-white group-hover:text-blue-300">
-                        Customer
+                      <h3 className="text-lg font-semibold text-white group-hover:text-blue-300 transition-colors">
+                        Client
                       </h3>
                       <p className="text-blue-100/60 text-sm mt-1">
-                        Book rooms and equipment
+                        Réservez des chambres et des équipements
                       </p>
                     </div>
-                    <div className="w-5 h-5 rounded-full border-2 border-white/30 group-hover:border-blue-400"></div>
+                    <div className="w-5 h-5 rounded-full border-2 border-white/30 group-hover:border-blue-400 transition-colors"></div>
                   </div>
                 </button>
 
                 <button
                   onClick={() => handleRoleSelect('LANDLORD')}
-                  className="w-full p-6 text-left rounded-lg border-2 border-white/20 hover:border-cyan-400/50 hover:bg-white/5 transition-all group"
+                  className="w-full p-6 text-left rounded-lg border-2 border-white/20 hover:border-cyan-400/50 hover:bg-white/5 transition-all group animate-in fade-in slide-in-from-left duration-300 delay-200"
                 >
                   <div className="flex items-start justify-between">
                     <div>
-                      <h3 className="text-lg font-semibold text-white group-hover:text-cyan-300">
-                        Landlord
+                      <h3 className="text-lg font-semibold text-white group-hover:text-cyan-300 transition-colors">
+                        Propriétaire
                       </h3>
                       <p className="text-blue-100/60 text-sm mt-1">
-                        List and manage your properties
+                        Listez et gérez vos propriétés
                       </p>
                     </div>
-                    <div className="w-5 h-5 rounded-full border-2 border-white/30 group-hover:border-cyan-400"></div>
+                    <div className="w-5 h-5 rounded-full border-2 border-white/30 group-hover:border-cyan-400 transition-colors"></div>
                   </div>
                 </button>
               </div>
@@ -148,75 +148,75 @@ export default function RegisterPage() {
               <div className="mb-8">
                 <button
                   onClick={() => setStep('role')}
-                  className="text-blue-100 hover:text-white text-sm mb-4 flex items-center gap-2"
+                  className="text-blue-100 hover:text-white text-sm mb-4 flex items-center gap-2 transition-colors"
                 >
-                  ← Back to role selection
+                  ← Retour au choix du rôle
                 </button>
-                <h1 className="text-3xl font-bold text-white mb-2">Create Account</h1>
+                <h1 className="text-3xl font-bold text-white mb-2">Créer un Compte</h1>
                 <p className="text-blue-100/70">
-                  {role === 'CUSTOMER' ? 'As a customer' : 'As a landlord'}
+                  {role === 'CUSTOMER' ? 'En tant que client' : 'En tant que propriétaire'}
                 </p>
               </div>
 
               {error && (
-                <div className="mb-6 p-4 bg-red-500/20 border border-red-500/50 rounded-lg">
+                <div className="mb-6 p-4 bg-red-500/20 border border-red-500/50 rounded-lg animate-in fade-in slide-in-from-top duration-300">
                   <p className="text-red-100 text-sm">{error}</p>
                 </div>
               )}
 
               <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
+                <div className="animate-in fade-in slide-in-from-bottom duration-300 delay-100">
                   <label className="block text-sm font-medium text-blue-100 mb-2">
-                    Full Name
+                    Nom Complet
                   </label>
                   <Input
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="John Doe"
-                    className="bg-white/10 border-white/20 text-white placeholder-white/50"
+                    placeholder="Jean Dupont"
+                    className="bg-white/10 border-white/20 text-white placeholder-white/50 focus:border-cyan-400 focus:ring-cyan-400/20 transition-all"
                     required
                   />
                 </div>
 
-                <div>
+                <div className="animate-in fade-in slide-in-from-bottom duration-300 delay-150">
                   <label className="block text-sm font-medium text-blue-100 mb-2">
-                    Email Address
+                    Adresse Email
                   </label>
                   <Input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@example.com"
-                    className="bg-white/10 border-white/20 text-white placeholder-white/50"
+                    placeholder="vous@exemple.com"
+                    className="bg-white/10 border-white/20 text-white placeholder-white/50 focus:border-cyan-400 focus:ring-cyan-400/20 transition-all"
                     required
                   />
                 </div>
 
-                <div>
+                <div className="animate-in fade-in slide-in-from-bottom duration-300 delay-200">
                   <label className="block text-sm font-medium text-blue-100 mb-2">
-                    Password
+                    Mot de passe
                   </label>
                   <Input
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="bg-white/10 border-white/20 text-white placeholder-white/50"
+                    className="bg-white/10 border-white/20 text-white placeholder-white/50 focus:border-cyan-400 focus:ring-cyan-400/20 transition-all"
                     required
                   />
                 </div>
 
-                <div>
+                <div className="animate-in fade-in slide-in-from-bottom duration-300 delay-250">
                   <label className="block text-sm font-medium text-blue-100 mb-2">
-                    Confirm Password
+                    Confirmer le mot de passe
                   </label>
                   <Input
                     type="password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="bg-white/10 border-white/20 text-white placeholder-white/50"
+                    className="bg-white/10 border-white/20 text-white placeholder-white/50 focus:border-cyan-400 focus:ring-cyan-400/20 transition-all"
                     required
                   />
                 </div>
@@ -224,17 +224,17 @@ export default function RegisterPage() {
                 <Button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-semibold py-2 rounded-lg transition-all"
+                  className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-semibold py-2 rounded-lg transition-all mt-4 hover:scale-[1.02] shadow-lg hover:shadow-cyan-500/20 animate-in fade-in slide-in-from-bottom duration-300 delay-300"
                 >
-                  {isLoading ? 'Creating account...' : 'Create Account'}
+                  {isLoading ? 'Création du compte...' : 'Créer le Compte'}
                 </Button>
               </form>
 
-              <div className="mt-6 pt-6 border-t border-white/10">
+              <div className="mt-6 pt-6 border-t border-white/10 animate-in fade-in duration-500 delay-500">
                 <p className="text-blue-100/70 text-sm text-center">
-                  Already have an account?{' '}
-                  <Link href="/auth/signin" className="text-blue-400 hover:text-blue-300">
-                    Sign in
+                  Vous avez déjà un compte ?{' '}
+                  <Link href="/auth/signin" className="text-blue-400 hover:text-blue-300 transition-colors">
+                    Se connecter
                   </Link>
                 </p>
               </div>
