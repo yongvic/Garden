@@ -4,10 +4,10 @@ import { prisma } from "@/lib/prisma"
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params
+    const { id } = await params
 
     const listing = await prisma.listing.findUnique({
       where: { id },
@@ -45,7 +45,7 @@ export async function GET(
     const averageRating =
       listing.reviews.length > 0
         ? listing.reviews.reduce((sum, r) => sum + r.rating, 0) /
-          listing.reviews.length
+        listing.reviews.length
         : 0
 
     const { reviews, ...listingData } = listing
@@ -67,7 +67,7 @@ export async function GET(
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth()
@@ -76,7 +76,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { id } = params
+    const { id } = await params
     const body = await req.json()
 
     // Verify ownership
@@ -116,7 +116,7 @@ export async function PATCH(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth()
@@ -125,7 +125,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { id } = params
+    const { id } = await params
 
     // Verify ownership
     const listing = await prisma.listing.findUnique({

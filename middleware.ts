@@ -1,5 +1,8 @@
-import { auth } from "@/auth"
-import { NextRequest, NextResponse } from "next/server"
+import NextAuth from "next-auth"
+import { authConfig } from "./auth.config"
+import { NextResponse } from "next/server"
+
+const { auth } = NextAuth(authConfig)
 
 // Routes that require authentication
 const protectedRoutes = [
@@ -10,31 +13,23 @@ const protectedRoutes = [
   "/admin",
 ]
 
-// Public routes (accessible without auth)
-const publicRoutes = [
-  "/",
-  "/about",
-  "/search",
-  "/auth/signin",
-  "/auth/error",
-]
-
-export const middleware = auth((req: any) => {
-  const pathname = req.nextUrl.pathname
+export default auth((req) => {
+  const { nextUrl } = req
+  const isLoggedIn = !!req.auth
   const isProtected = protectedRoutes.some((route) =>
-    pathname.startsWith(route)
+    nextUrl.pathname.startsWith(route)
   )
 
   // If route is protected and user is not authenticated, redirect to signin
-  if (isProtected && !req.auth) {
-    const signInUrl = new URL("/auth/signin", req.nextUrl.origin)
-    signInUrl.searchParams.set("callbackUrl", pathname)
+  if (isProtected && !isLoggedIn) {
+    const signInUrl = new URL("/auth/signin", nextUrl.origin)
+    signInUrl.searchParams.set("callbackUrl", nextUrl.pathname)
     return NextResponse.redirect(signInUrl)
   }
 
   // Role-based access control
-  if (pathname.startsWith("/admin") && req.auth?.user?.role !== "ADMIN") {
-    return NextResponse.redirect(new URL("/", req.nextUrl.origin))
+  if (nextUrl.pathname.startsWith("/admin") && req.auth?.user?.role !== "ADMIN") {
+    return NextResponse.redirect(new URL("/", nextUrl.origin))
   }
 
   return NextResponse.next()

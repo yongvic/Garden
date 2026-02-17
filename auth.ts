@@ -1,32 +1,17 @@
 import NextAuth from "next-auth"
 import { PrismaAdapter } from "@auth/prisma-adapter"
-import CredentialsProvider from "next-auth/providers/credentials"
-import GitHub from "next-auth/providers/github"
-import Google from "next-auth/providers/google"
-import { prisma } from "./lib/prisma"
+import { prisma } from "@/lib/prisma"
+import { authConfig } from "./auth.config"
+import Credentials from "next-auth/providers/credentials"
 import bcrypt from "bcryptjs"
 import { Role } from "@prisma/client"
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: PrismaAdapter(prisma),
-  session: {
-    strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 days
-  },
-  pages: {
-    signIn: "/auth/signin",
-    error: "/auth/error",
-  },
+  ...authConfig,
+  adapter: PrismaAdapter(prisma) as any,
   providers: [
-    GitHub({
-      clientId: process.env.AUTH_GITHUB_ID,
-      clientSecret: process.env.AUTH_GITHUB_SECRET,
-    }),
-    Google({
-      clientId: process.env.AUTH_GOOGLE_ID,
-      clientSecret: process.env.AUTH_GOOGLE_SECRET,
-    }),
-    CredentialsProvider({
+    ...authConfig.providers.filter((provider: any) => provider.id !== "credentials"),
+    Credentials({
       name: "Credentials",
       credentials: {
         email: { label: "Email", type: "email" },
@@ -59,11 +44,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           email: user.email,
           name: user.name,
           image: user.image,
+          role: user.role,
         }
       },
     }),
   ],
   callbacks: {
+    ...authConfig.callbacks,
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id
@@ -76,17 +63,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
       return token
     },
-    async session({ session, token }) {
-      if (session.user) {
-        session.user.id = token.id as string
-        session.user.role = token.role as Role
-      }
-      return session
-    },
-  },
-  events: {
-    async signIn({ user }) {
-      console.log(`User ${user.email} signed in`)
-    },
-  },
+  }
 })
+

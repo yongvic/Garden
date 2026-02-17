@@ -112,11 +112,14 @@ export async function POST(req: NextRequest) {
       )
       const totalPrice = listing.pricePerDay * days
 
+      const customerId = session.user.id
+      if (!customerId) throw new Error("User ID is required")
+
       // Create booking
       return tx.booking.create({
         data: {
           listingId,
-          customerId: session.user.id,
+          customerId,
           checkInDate: checkIn,
           checkOutDate: checkOut,
           numberOfGuests,
