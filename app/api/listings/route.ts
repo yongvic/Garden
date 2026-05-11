@@ -81,8 +81,18 @@ export async function GET(req: NextRequest) {
     const page = parseInt(searchParams.get("page") || "1")
     const limit = parseInt(searchParams.get("limit") || "12")
 
-    const where: any = {
-      isActive: true,
+    const mine = searchParams.get("mine") === "true"
+
+    const where: any = {}
+
+    if (mine) {
+      const session = await auth()
+      if (!session?.user?.id) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      }
+      where.landlordId = session.user.id
+    } else {
+      where.isActive = true
     }
 
     if (type && ["ROOM", "EQUIPMENT", "SPACE"].includes(type)) {

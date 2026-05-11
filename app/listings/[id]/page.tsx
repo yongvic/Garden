@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, use } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Navbar from '@/components/navbar'
@@ -15,6 +15,7 @@ interface ListingDetail {
   type: string
   location: string
   pricePerDay: number
+  isActive: boolean
   images: string[]
   amenities: string[]
   rules: string
@@ -99,7 +100,8 @@ const TYPE_LABELS: Record<string, string> = {
   SPACE: '🏢 Espace', ROOM: '🛏 Chambre', EQUIPMENT: '🎛 Équipement'
 }
 
-export default function ListingDetailPage({ params }: { params: { id: string } }) {
+export default function ListingDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = use(props.params)
   const { data: session } = useSession()
   const router = useRouter()
   const [listing, setListing] = useState<ListingDetail | null>(null)
@@ -109,6 +111,8 @@ export default function ListingDetailPage({ params }: { params: { id: string } }
   const [isFav, setIsFav] = useState(false)
   const [favCount, setFavCount] = useState(0)
   const [toastMsg, setToastMsg] = useState('')
+  const [isToggling, setIsToggling] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   // Booking state
   const [checkInDate, setCheckInDate] = useState('')
@@ -148,6 +152,34 @@ export default function ListingDetailPage({ params }: { params: { id: string } }
     setIsFav(data.favorited)
     setFavCount(prev => data.favorited ? prev + 1 : Math.max(0, prev - 1))
     showToast(data.favorited ? '❤️ Ajouté aux favoris' : '🤍 Retiré des favoris')
+  }
+
+  const toggleActive = async () => {
+    if (!listing) return
+    setIsToggling(true)
+    try {
+      const res = await fetch(`/api/listings/${listing.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: !listing.isActive }),
+      })
+      if (!res.ok) throw new Error((await res.json()).error)
+      setListing(prev => prev ? { ...prev, isActive: !prev.isActive } : prev)
+      showToast(listing.isActive ? 'Annonce désactivée' : 'Annonce activée')
+    } catch (e) { setError((e as Error).message) }
+    finally { setIsToggling(false) }
+  }
+
+  const deleteListing = async () => {
+    if (!listing) return
+    if (!confirm('Supprimer cette annonce définitivement ?')) return
+    setIsDeleting(true)
+    try {
+      const res = await fetch(`/api/listings/${listing.id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error((await res.json()).error)
+      router.push('/landlord/listings')
+    } catch (e) { setError((e as Error).message) }
+    finally { setIsDeleting(false) }
   }
 
   const handleShare = () => {
@@ -220,6 +252,16 @@ export default function ListingDetailPage({ params }: { params: { id: string } }
                     <h1 className="text-3xl font-bold text-white">{listing.title}</h1>
                   </div>
                   <div className="flex items-center gap-2">
+                    {session?.user?.id === listing.landlord.id && (
+                      <div className="flex items-center gap-2 mr-2 border-r border-white/10 pr-4">
+                        <button onClick={toggleActive} disabled={isToggling} className={`text-xs px-3 py-2 rounded-xl border transition-all font-medium ${listing.isActive ? 'bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/20' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20'}`}>
+                          {listing.isActive ? 'Désactiver' : 'Activer'}
+                        </button>
+                        <button onClick={deleteListing} disabled={isDeleting} className="text-xs px-3 py-2 rounded-xl border border-red-500/20 text-red-400 bg-red-500/10 hover:bg-red-500/20 transition-all font-medium">
+                          Supprimer
+                        </button>
+                      </div>
+                    )}
                     <button onClick={handleToggleFav} className={`flex items-center gap-1.5 px-4 py-2 rounded-xl border transition-all text-sm font-medium ${isFav ? 'bg-red-500/20 border-red-500/40 text-red-400' : 'bg-white/5 border-white/15 text-slate-400 hover:text-red-400 hover:border-red-500/30'}`}>
                       <Heart className={`w-4 h-4 ${isFav ? 'fill-current' : ''}`} />
                       {favCount}
