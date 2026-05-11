@@ -7,6 +7,7 @@ import bcrypt from "bcryptjs"
 const updateProfileSchema = z.object({
   name: z.string().min(2).max(100).optional(),
   image: z.string().url().optional().nullable(),
+  phone: z.string().optional().nullable(),
   currentPassword: z.string().optional(),
   newPassword: z.string().min(8).optional(),
 })
@@ -27,6 +28,7 @@ export async function GET() {
         email: true,
         image: true,
         role: true,
+        phone: true,
         createdAt: true,
       },
     })
@@ -63,12 +65,13 @@ export async function PATCH(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { name, image, currentPassword, newPassword } = updateProfileSchema.parse(body)
+    const { name, image, phone, currentPassword, newPassword } = updateProfileSchema.parse(body)
 
     const updateData: Record<string, unknown> = {}
 
     if (name !== undefined) updateData.name = name
     if (image !== undefined) updateData.image = image
+    if (phone !== undefined) updateData.phone = phone
 
     // Handle password change
     if (currentPassword && newPassword) {
@@ -98,7 +101,7 @@ export async function PATCH(req: NextRequest) {
     const updated = await prisma.user.update({
       where: { id: session.user.id },
       data: updateData,
-      select: { id: true, name: true, email: true, image: true, role: true },
+      select: { id: true, name: true, email: true, image: true, role: true, phone: true },
     })
 
     return NextResponse.json(updated)

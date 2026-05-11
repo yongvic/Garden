@@ -194,7 +194,7 @@ export default function Navbar() {
                         )}
                         <div className="border-t border-white/8 mt-1 pt-1">
                           <button
-                            onClick={() => { setUserMenuOpen(false); signOut({ callbackUrl: '/' }) }}
+                            onClick={() => { setUserMenuOpen(false); signOut({ callbackUrl: typeof window !== 'undefined' ? window.location.origin : '/' }) }}
                             className="flex items-center gap-3 px-4 py-2.5 text-red-400 hover:text-red-300 hover:bg-red-500/5 transition-colors text-sm w-full text-left"
                           >
                             <LogOut className="w-4 h-4" /> Déconnexion
@@ -275,7 +275,7 @@ export default function Navbar() {
               )}
               <div className="pt-2 border-t border-white/8">
                 <button
-                  onClick={() => { setMobileOpen(false); signOut({ callbackUrl: '/' }) }}
+                  onClick={() => { setMobileOpen(false); signOut({ callbackUrl: typeof window !== 'undefined' ? window.location.origin : '/' }) }}
                   className="flex items-center gap-3 px-3 py-3 rounded-xl text-red-400 hover:text-red-300 hover:bg-red-500/5 transition-colors w-full"
                 >
                   <LogOut className="w-5 h-5" /> Déconnexion

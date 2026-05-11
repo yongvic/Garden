@@ -22,9 +22,10 @@ export async function POST(req: NextRequest) {
   try {
     const session = await auth()
 
-    if (!session?.user?.id || (session.user as any).role === "CUSTOMER") {
+    const userRole = (session.user as any).role as string
+    if (!session?.user?.id || !["LANDLORD", "ADMIN"].includes(userRole)) {
       return NextResponse.json(
-        { error: "Only landlords can create listings" },
+        { error: "Seuls les propriétaires peuvent créer des annonces. Vérifiez que votre compte a le rôle LANDLORD." },
         { status: 403 }
       )
     }

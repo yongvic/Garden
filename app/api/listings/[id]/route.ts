@@ -8,6 +8,10 @@ export async function GET(
 ) {
   try {
     const { id } = await params
+    const session = await auth()
+
+    // Increment view count
+    await prisma.listing.update({ where: { id }, data: { viewCount: { increment: 1 } } }).catch(() => {})
 
     const listing = await prisma.listing.findUnique({
       where: { id },
@@ -18,6 +22,8 @@ export async function GET(
             name: true,
             image: true,
             email: true,
+            phone: true,
+            isVerified: true,
           },
         },
         reviews: {
@@ -32,8 +38,20 @@ export async function GET(
           orderBy: { createdAt: "desc" },
           take: 5,
         },
+        _count: {
+          select: { favorites: true },
+        },
       },
     })
+
+    // Check if current user has favorited
+    let isFavorited = false
+    if (session?.user?.id && listing) {
+      const fav = await prisma.favorite.findUnique({
+        where: { userId_listingId: { userId: session.user.id, listingId: id } },
+      })
+      isFavorited = !!fav
+    }
 
     if (!listing) {
       return NextResponse.json(
@@ -54,6 +72,8 @@ export async function GET(
       ...listingData,
       averageRating: parseFloat(averageRating.toFixed(1)),
       reviewCount: listing.reviews.length,
+      favoriteCount: listing._count.favorites,
+      isFavorited,
       reviews,
     })
   } catch (error) {
