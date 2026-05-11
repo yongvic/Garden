@@ -2,8 +2,7 @@ import type { NextAuthConfig } from "next-auth"
 import Credentials from "next-auth/providers/credentials"
 import GitHub from "next-auth/providers/github"
 import Google from "next-auth/providers/google"
-import { Role } from "@prisma/client"
-import bcrypt from "bcryptjs"
+
 
 // Notice this is only an object, not a full Auth.js instance
 export const authConfig = {
@@ -47,7 +46,7 @@ export const authConfig = {
     async jwt({ token, user, trigger, session }) {
         if (user) {
             token.id = user.id
-            token.role = (user as any).role || Role.CUSTOMER
+            token.role = (user as any).role || "CUSTOMER"
         }
         
         // Update session if triggered
@@ -60,7 +59,7 @@ export const authConfig = {
     async session({ session, token }) {
       if (token && session.user) {
         session.user.id = token.id as string
-        session.user.role = token.role as Role
+        session.user.role = token.role as any
       }
       return session
     },
