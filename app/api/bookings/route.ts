@@ -182,6 +182,7 @@ export async function GET(req: NextRequest) {
 
     const searchParams = req.nextUrl.searchParams
     const listingId = searchParams.get("listingId")
+    const status = searchParams.get("status")
 
     if (listingId) {
       // Get bookings for a specific listing
@@ -201,11 +202,14 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ bookings })
     }
 
+    const where: any = { customerId: session.user.id }
+    if (status && status !== "ALL") {
+      where.status = status
+    }
+
     // Get user's bookings
     const bookings = await prisma.booking.findMany({
-      where: {
-        customerId: session.user.id,
-      },
+      where,
       include: {
         listing: true,
       },

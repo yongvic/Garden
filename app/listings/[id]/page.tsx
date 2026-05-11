@@ -207,8 +207,8 @@ export default function ListingDetailPage(props: { params: Promise<{ id: string 
         }),
       })
       if (!res.ok) throw new Error((await res.json()).error || 'Échec de la réservation')
-      const booking = await res.json()
-      router.push(`/bookings/${booking.id}`)
+      const bookingData = await res.json()
+      router.push(`/bookings/${bookingData.booking.id}`)
     } catch (err) { setBookingError((err as Error).message) }
     finally { setIsBooking(false) }
   }
