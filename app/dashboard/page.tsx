@@ -3,33 +3,26 @@
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import Navbar from '@/components/navbar'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { formatCurrency, formatBookingStatus, getBookingStatusColor } from '@/lib/format'
+import { Calendar, Home, Search, Star, TrendingUp, Clock } from 'lucide-react'
 
-interface DashboardData {
+interface DashboardStats {
   user: {
-    id: string
-    name: string
-    email: string
-    role: string
+    id: string; name: string | null; email: string | null; role: string; createdAt: string
   }
   bookingStats: {
-    total: number
-    confirmed: number
-    pending: number
-    completed: number
+    total: number; pending: number; confirmed: number; completed: number; cancelled: number
   }
 }
-
-// ... imports ...
-
-// ... interfaces ...
 
 export default function DashboardPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
-  const [data, setData] = useState<DashboardData | null>(null)
+  const [stats, setStats] = useState<DashboardStats | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -37,175 +30,165 @@ export default function DashboardPage() {
       router.push('/auth/signin')
       return
     }
-
-    if (status === 'authenticated' && session?.user) {
-      // For now, we'll show user info. In production, fetch real dashboard data
-      setData({
-        user: {
-          id: session.user.id as string,
-          name: session.user.name || '',
-          email: session.user.email || '',
-          role: (session.user as any).role || 'CUSTOMER',
-        },
-        bookingStats: {
-          total: 0,
-          confirmed: 0,
-          pending: 0,
-          completed: 0,
-        },
-      })
-      setIsLoading(false)
+    if (status === 'authenticated') {
+      const role = (session?.user as any)?.role
+      if (role === 'LANDLORD') {
+        router.push('/landlord/dashboard')
+        return
+      }
+      if (role === 'ADMIN') {
+        router.push('/admin/dashboard')
+        return
+      }
+      // Customer: load real stats
+      fetch('/api/users/me')
+        .then((r) => r.json())
+        .then((data) => {
+          setStats({
+            user: {
+              id: data.id,
+              name: data.name,
+              email: data.email,
+              role: data.role,
+              createdAt: data.createdAt,
+            },
+            bookingStats: data.bookingStats,
+          })
+        })
+        .catch(console.error)
+        .finally(() => setIsLoading(false))
     }
   }, [status, session, router])
 
-  if (isLoading || !data) {
+  if (isLoading || !stats) {
     return (
       <>
         <Navbar />
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center">
-          <p className="text-white/70">Chargement du tableau de bord...</p>
-        </div>
+        <main className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 flex items-center justify-center">
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-10 h-10 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin" />
+            <p className="text-slate-400 text-sm">Chargement...</p>
+          </div>
+        </main>
       </>
     )
   }
 
-  const isDashboardLandlord = data.user.role === 'LANDLORD'
+  const statCards = [
+    { label: 'Total', value: stats.bookingStats.total, icon: <Calendar className="w-5 h-5 text-blue-400" />, color: 'from-blue-500/20 to-blue-600/10', border: 'border-blue-500/20' },
+    { label: 'Confirmées', value: stats.bookingStats.confirmed, icon: <Star className="w-5 h-5 text-emerald-400" />, color: 'from-emerald-500/20 to-emerald-600/10', border: 'border-emerald-500/20' },
+    { label: 'En attente', value: stats.bookingStats.pending, icon: <Clock className="w-5 h-5 text-amber-400" />, color: 'from-amber-500/20 to-amber-600/10', border: 'border-amber-500/20' },
+    { label: 'Terminées', value: stats.bookingStats.completed, icon: <TrendingUp className="w-5 h-5 text-cyan-400" />, color: 'from-cyan-500/20 to-cyan-600/10', border: 'border-cyan-500/20' },
+  ]
 
   return (
     <>
       <Navbar />
-      <main className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 pt-20">
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-20 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse duration-[4000ms]"></div>
-          <div className="absolute bottom-20 right-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl animate-pulse duration-[5000ms]"></div>
+      <main className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 pt-24 pb-12">
+        {/* Ambient */}
+        <div className="fixed inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-40 left-1/4 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '6s' }} />
+          <div className="absolute bottom-40 right-1/4 w-96 h-96 bg-cyan-500/5 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '8s' }} />
         </div>
 
-        <div className="relative max-w-6xl mx-auto px-4 py-12">
-          {/* Welcome Section */}
-          <Card className="mb-8 backdrop-blur-md bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border border-white/20 p-8 animate-in fade-in slide-in-from-top duration-500">
-            <h1 className="text-4xl font-bold text-white mb-2">
-              Bon retour, {data.user.name} !
-            </h1>
-            <p className="text-blue-100/70">
-              {isDashboardLandlord
-                ? 'Gérez vos annonces et réservations'
-                : 'Gérez vos réservations'}
-            </p>
-          </Card>
+        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 space-y-8">
 
-          {/* Quick Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-            {[
-              { label: 'Total Réservations', value: data.bookingStats.total, color: 'from-blue-500' },
-              { label: 'Confirmées', value: data.bookingStats.confirmed, color: 'from-green-500' },
-              { label: 'En Attente', value: data.bookingStats.pending, color: 'from-yellow-500' },
-              { label: 'Terminées', value: data.bookingStats.completed, color: 'from-cyan-500' },
-            ].map((stat, idx) => (
-              <Card
-                key={idx}
-                className="backdrop-blur-md bg-white/10 border border-white/20 p-6 animate-in fade-in slide-in-from-bottom duration-500"
-                style={{ animationDelay: `${idx * 100}ms` }}
+          {/* Welcome banner */}
+          <div className="backdrop-blur-xl bg-gradient-to-r from-blue-500/15 to-cyan-500/10 border border-blue-500/20 rounded-2xl p-8 animate-in fade-in slide-in-from-top duration-500">
+            <h1 className="text-3xl font-bold text-white mb-2">
+              👋 Bon retour, {stats.user.name ?? 'Utilisateur'} !
+            </h1>
+            <p className="text-slate-400">
+              Découvrez de nouveaux espaces à réserver ou consultez vos réservations.
+            </p>
+          </div>
+
+          {/* Stats grid */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {statCards.map((card, i) => (
+              <div
+                key={card.label}
+                className={`backdrop-blur-xl bg-gradient-to-br ${card.color} border ${card.border} rounded-2xl p-5 animate-in fade-in slide-in-from-bottom duration-500`}
+                style={{ animationDelay: `${i * 80}ms` }}
               >
-                <p className="text-white/70 text-sm mb-2">{stat.label}</p>
-                <p className={`text-3xl font-bold bg-gradient-to-r ${stat.color} to-transparent bg-clip-text text-transparent`}>
-                  {stat.value}
-                </p>
-              </Card>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-2 bg-white/5 rounded-xl">{card.icon}</div>
+                </div>
+                <p className="text-3xl font-bold text-white mb-1">{card.value}</p>
+                <p className="text-slate-400 text-sm">{card.label}</p>
+              </div>
             ))}
           </div>
 
-          {/* Navigation Buttons */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            {!isDashboardLandlord && (
-              <>
-                <Card className="backdrop-blur-md bg-white/10 border border-white/20 p-8 hover:border-white/40 transition-all cursor-pointer group hover:-translate-y-1">
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <h3 className="text-white text-xl font-semibold mb-2">Mes Réservations</h3>
-                      <p className="text-blue-100/70">Voir et gérer toutes vos réservations</p>
-                    </div>
-                    <span className="text-3xl">🎫</span>
+          {/* Action cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Link href="/bookings">
+              <div className="group backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-7 hover:border-blue-500/30 hover:-translate-y-1 transition-all cursor-pointer h-full">
+                <div className="flex items-start justify-between mb-5">
+                  <div className="p-3 bg-blue-500/20 rounded-2xl">
+                    <Calendar className="w-6 h-6 text-blue-400" />
                   </div>
-                  <Button className="w-full mt-4 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white">
-                    Voir les Réservations
-                  </Button>
-                </Card>
+                  <span className="text-slate-500 text-xs">→</span>
+                </div>
+                <h3 className="text-white text-lg font-semibold mb-2">Mes Réservations</h3>
+                <p className="text-slate-400 text-sm">Voir et gérer toutes vos réservations en cours et passées.</p>
+                <div className="mt-5 pt-4 border-t border-white/5 flex gap-3">
+                  {stats.bookingStats.pending > 0 && (
+                    <span className="text-xs bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-1 rounded-full">
+                      {stats.bookingStats.pending} en attente
+                    </span>
+                  )}
+                  {stats.bookingStats.confirmed > 0 && (
+                    <span className="text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-1 rounded-full">
+                      {stats.bookingStats.confirmed} confirmée{stats.bookingStats.confirmed > 1 ? 's' : ''}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </Link>
 
-                <Card className="backdrop-blur-md bg-white/10 border border-white/20 p-8 hover:border-white/40 transition-all cursor-pointer group hover:-translate-y-1">
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <h3 className="text-white text-xl font-semibold mb-2">Explorer les Annonces</h3>
-                      <p className="text-blue-100/70">Trouver de nouveaux espaces à réserver</p>
-                    </div>
-                    <span className="text-3xl">🔍</span>
+            <Link href="/search">
+              <div className="group backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-7 hover:border-cyan-500/30 hover:-translate-y-1 transition-all cursor-pointer h-full">
+                <div className="flex items-start justify-between mb-5">
+                  <div className="p-3 bg-cyan-500/20 rounded-2xl">
+                    <Search className="w-6 h-6 text-cyan-400" />
                   </div>
-                  <Button className="w-full mt-4 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white">
-                    Rechercher Maintenant
-                  </Button>
-                </Card>
-              </>
-            )}
-
-            {isDashboardLandlord && (
-              <>
-                <Card className="backdrop-blur-md bg-white/10 border border-white/20 p-8 hover:border-white/40 transition-all cursor-pointer group hover:-translate-y-1">
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <h3 className="text-white text-xl font-semibold mb-2">Mes Annonces</h3>
-                      <p className="text-blue-100/70">Gérez vos propriétés</p>
-                    </div>
-                    <span className="text-3xl">🏠</span>
-                  </div>
-                  <Button className="w-full mt-4 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white">
-                    Voir les Annonces
-                  </Button>
-                </Card>
-
-                <Card className="backdrop-blur-md bg-white/10 border border-white/20 p-8 hover:border-white/40 transition-all cursor-pointer group hover:-translate-y-1">
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <h3 className="text-white text-xl font-semibold mb-2">Nouvelles Réservations</h3>
-                      <p className="text-blue-100/70">Gérer les demandes entrantes</p>
-                    </div>
-                    <span className="text-3xl">📋</span>
-                  </div>
-                  <Button className="w-full mt-4 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white">
-                    Voir les Demandes
-                  </Button>
-                </Card>
-              </>
-            )}
+                  <span className="text-slate-500 text-xs">→</span>
+                </div>
+                <h3 className="text-white text-lg font-semibold mb-2">Explorer les Annonces</h3>
+                <p className="text-slate-400 text-sm">Trouvez de nouvelles chambres, espaces et équipements près de chez vous.</p>
+                <div className="mt-5 pt-4 border-t border-white/5">
+                  <span className="text-xs text-slate-500">Chambres · Espaces · Équipements</span>
+                </div>
+              </div>
+            </Link>
           </div>
 
-          {/* Account Settings */}
-          <Card className="backdrop-blur-md bg-white/10 border border-white/20 p-8">
-            <h2 className="text-white text-xl font-semibold mb-6">Informations du Compte</h2>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Profile summary */}
+          <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-7">
+            <h2 className="text-white text-lg font-semibold mb-6">Informations du compte</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div>
-                <p className="text-white/70 text-sm mb-2">Nom Complet</p>
-                <p className="text-white font-medium">{data.user.name}</p>
+                <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">Nom</p>
+                <p className="text-white font-medium">{stats.user.name ?? '—'}</p>
               </div>
               <div>
-                <p className="text-white/70 text-sm mb-2">Email</p>
-                <p className="text-white font-medium">{data.user.email}</p>
+                <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">Email</p>
+                <p className="text-white font-medium">{stats.user.email ?? '—'}</p>
               </div>
               <div>
-                <p className="text-white/70 text-sm mb-2">Type de Compte</p>
-                <p className="text-white font-medium capitalize">
-                  {data.user.role === 'LANDLORD' ? 'Propriétaire' : 'Client'}
-                </p>
-              </div>
-              <div>
-                <p className="text-white/70 text-sm mb-2">Membre Depuis</p>
-                <p className="text-white font-medium">Janvier 2024</p>
+                <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">Type de compte</p>
+                <p className="text-white font-medium capitalize">Client</p>
               </div>
             </div>
-
-            <Button className="mt-6 bg-white/10 border border-white/20 text-white hover:bg-white/20">
-              Modifier le Profil
-            </Button>
-          </Card>
+            <div className="mt-6 pt-6 border-t border-white/5">
+              <Link href="/profile">
+                <Button variant="outline" className="bg-white/5 border-white/15 text-white hover:bg-white/10 hover:text-white">
+                  Modifier le profil
+                </Button>
+              </Link>
+            </div>
+          </div>
         </div>
       </main>
     </>

@@ -7,6 +7,7 @@ import Navbar from '@/components/navbar'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Star, CheckCircle, AlertTriangle } from 'lucide-react'
 
 interface ListingDetail {
   id: string
@@ -21,134 +22,147 @@ interface ListingDetail {
   cancellationPolicy: string
   averageRating: number
   reviewCount: number
-  landlord: {
-    id: string
-    name: string
-    image: string
-    email: string
-  }
+  landlord: { id: string; name: string | null; image: string | null; email: string | null }
   reviews: Array<{
-    id: string
-    rating: number
-    title: string
-    comment: string
-    createdAt: string
-    user: {
-      name: string
-      image: string
-    }
+    id: string; rating: number; title: string; comment: string; createdAt: string
+    user: { name: string | null; image: string | null }
   }>
 }
 
-// ... imports ...
+function ReviewForm({ listingId, onReviewAdded }: { listingId: string, onReviewAdded: () => void }) {
+  const [rating, setRating] = useState(5)
+  const [title, setTitle] = useState('')
+  const [comment, setComment] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
 
-// ... interface ListingDetail ...
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSubmitting(true); setError(''); setSuccess('')
+    try {
+      const res = await fetch('/api/reviews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ listingId, rating, title, comment })
+      })
+      if (!res.ok) throw new Error((await res.json()).error)
+      setSuccess('Merci pour votre avis !')
+      setTitle(''); setComment(''); setRating(5)
+      setTimeout(onReviewAdded, 1500)
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4 mt-6 pt-6 border-t border-white/10">
+      <h3 className="text-white font-semibold flex items-center gap-2">Laisser un avis</h3>
+      {error && <div className="p-3 bg-red-500/10 text-red-300 text-sm rounded-xl">{error}</div>}
+      {success && <div className="p-3 bg-emerald-500/10 text-emerald-300 text-sm rounded-xl">{success}</div>}
+      <div className="flex gap-2">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <button key={star} type="button" onClick={() => setRating(star)} className="focus:outline-none">
+            <Star className={`w-6 h-6 ${star <= rating ? 'text-yellow-400 fill-yellow-400' : 'text-slate-600'}`} />
+          </button>
+        ))}
+      </div>
+      <Input
+        value={title} onChange={e => setTitle(e.target.value)}
+        placeholder="Titre de l'avis" required maxLength={100}
+        className="bg-white/5 border-white/10 text-white placeholder-slate-500"
+      />
+      <textarea
+        value={comment} onChange={e => setComment(e.target.value)}
+        placeholder="Partagez votre expérience avec cet espace..." required rows={3}
+        className="w-full bg-white/5 border border-white/10 text-white rounded-md px-3 py-2 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+      />
+      <Button type="submit" disabled={isSubmitting || !title || !comment} className="bg-cyan-500 hover:bg-cyan-600 text-white">
+        {isSubmitting ? 'Envoi...' : 'Publier l\'avis'}
+      </Button>
+    </form>
+  )
+}
 
 export default function ListingDetailPage({ params }: { params: { id: string } }) {
   const { data: session } = useSession()
   const router = useRouter()
-
   const [listing, setListing] = useState<ListingDetail | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
 
-  const [bookingData, setBookingData] = useState({
-    checkInDate: '',
-    checkOutDate: '',
-    numberOfGuests: 1,
-    specialRequests: '',
-  })
-
+  // Booking state
+  const [checkInDate, setCheckInDate] = useState('')
+  const [checkOutDate, setCheckOutDate] = useState('')
+  const [numberOfGuests, setNumberOfGuests] = useState(1)
+  const [specialRequests, setSpecialRequests] = useState('')
   const [isBooking, setIsBooking] = useState(false)
+  const [bookingError, setBookingError] = useState('')
 
-  // ... useEffect ...
+  const fetchListing = () => {
+    fetch(`/api/listings/${params.id}`)
+      .then(res => { if (!res.ok) throw new Error('Annonce introuvable'); return res.json() })
+      .then(data => setListing(data))
+      .catch(err => setError(err.message))
+      .finally(() => setIsLoading(false))
+  }
+
+  useEffect(() => { fetchListing() }, [params.id])
 
   const handleBooking = async (e: React.FormEvent) => {
     e.preventDefault()
-
-    if (!session?.user?.id) {
-      router.push('/auth/signin')
-      return
-    }
-
-    setIsBooking(true)
+    if (!session?.user?.id) { router.push('/auth/signin'); return }
+    setIsBooking(true); setBookingError('')
     try {
       const res = await fetch('/api/bookings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           listingId: params.id,
-          checkInDate: new Date(bookingData.checkInDate).toISOString(),
-          checkOutDate: new Date(bookingData.checkOutDate).toISOString(),
-          numberOfGuests: bookingData.numberOfGuests,
-          specialRequests: bookingData.specialRequests,
+          checkInDate: new Date(checkInDate).toISOString(),
+          checkOutDate: new Date(checkOutDate).toISOString(),
+          numberOfGuests, specialRequests,
         }),
       })
-
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || 'Échec de la réservation')
-      }
-
+      if (!res.ok) throw new Error((await res.json()).error || 'Échec de la réservation')
       const booking = await res.json()
       router.push(`/bookings/${booking.id}`)
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setIsBooking(false)
-    }
+    } catch (err) { setBookingError((err as Error).message) }
+    finally { setIsBooking(false) }
   }
 
-  if (isLoading) {
-    return (
-      <>
-        <Navbar />
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center">
-          <p className="text-white/70">Chargement de l'annonce...</p>
-        </div>
-      </>
-    )
-  }
-
-  if (!listing) {
-    return (
-      <>
-        <Navbar />
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center">
-          <p className="text-red-400">{error || 'Annonce non trouvée'}</p>
-        </div>
-      </>
-    )
-  }
+  if (isLoading) return <><Navbar /><div className="min-h-screen bg-slate-900 flex justify-center items-center"><div className="w-10 h-10 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" /></div></>
+  if (error || !listing) return <><Navbar /><div className="min-h-screen bg-slate-900 flex justify-center items-center"><p className="text-red-400">{error || 'Introuvable'}</p></div></>
 
   return (
     <>
       <Navbar />
-      <main className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 pt-20">
-        <div className="max-w-6xl mx-auto px-4 py-12 space-y-8 animate-in fade-in duration-500">
-          {/* Image Gallery */}
+      <main className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 pt-24 pb-12">
+        <div className="max-w-6xl mx-auto px-4 space-y-8 animate-in fade-in duration-500">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
-              {listing.images.length > 0 ? (
-                <div className="relative group">
-                  <div className="aspect-video bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-xl overflow-hidden shadow-2xl">
-                    <img
-                      src={listing.images[currentImageIndex]}
-                      alt={listing.title}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    />
-                  </div>
+            
+            {/* Left Column */}
+            <div className="lg:col-span-2 space-y-6">
+              
+              {/* Header Info */}
+              <div>
+                <h1 className="text-3xl font-bold text-white mb-2">{listing.title}</h1>
+                <p className="text-slate-400 flex items-center gap-2">📍 {listing.location}</p>
+              </div>
 
+              {/* Gallery */}
+              {listing.images.length > 0 ? (
+                <div className="space-y-4">
+                  <div className="aspect-video bg-slate-800 rounded-2xl overflow-hidden">
+                    <img src={listing.images[currentImageIndex]} alt="" className="w-full h-full object-cover" />
+                  </div>
                   {listing.images.length > 1 && (
-                    <div className="flex gap-2 mt-4 overflow-x-auto pb-2">
+                    <div className="flex gap-2 overflow-x-auto pb-2">
                       {listing.images.map((img, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => setCurrentImageIndex(idx)}
-                          className={`w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all ${idx === currentImageIndex ? 'border-cyan-400 scale-110' : 'border-white/20 opacity-70 hover:opacity-100'
-                            }`}
-                        >
+                        <button key={idx} onClick={() => setCurrentImageIndex(idx)} className={`w-20 h-20 rounded-xl overflow-hidden border-2 transition-all shrink-0 ${idx === currentImageIndex ? 'border-cyan-400' : 'border-transparent opacity-60 hover:opacity-100'}`}>
                           <img src={img} alt="" className="w-full h-full object-cover" />
                         </button>
                       ))}
@@ -156,184 +170,131 @@ export default function ListingDetailPage({ params }: { params: { id: string } }
                   )}
                 </div>
               ) : (
-                <div className="aspect-video bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-xl flex items-center justify-center">
-                  <p className="text-white/50">Aucune image disponible</p>
-                </div>
+                <div className="aspect-video bg-slate-800 rounded-2xl flex items-center justify-center text-slate-500">Aucune image</div>
               )}
 
               {/* Description */}
-              <Card className="mt-8 backdrop-blur-md bg-white/10 border border-white/20 p-6 animate-in slide-in-from-bottom duration-500 delay-100">
-                <h2 className="text-white text-xl font-semibold mb-4">À propos de cette annonce</h2>
-                <p className="text-blue-100/70 leading-relaxed">{listing.description}</p>
-              </Card>
+              <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6">
+                <h2 className="text-white text-xl font-semibold mb-4">À propos de cet espace</h2>
+                <p className="text-slate-300 leading-relaxed whitespace-pre-line">{listing.description}</p>
+              </div>
 
               {/* Amenities */}
               {listing.amenities.length > 0 && (
-                <Card className="mt-6 backdrop-blur-md bg-white/10 border border-white/20 p-6 animate-in slide-in-from-bottom duration-500 delay-200">
+                <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6">
                   <h2 className="text-white text-xl font-semibold mb-4">Équipements</h2>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                     {listing.amenities.map((amenity, idx) => (
-                      <div key={idx} className="flex items-center gap-2 text-blue-100/70">
-                        <span className="text-cyan-400">✓</span>
-                        {amenity}
+                      <div key={idx} className="flex items-center gap-2 text-slate-300 text-sm">
+                        <CheckCircle className="w-4 h-4 text-cyan-400" /> {amenity}
                       </div>
                     ))}
                   </div>
-                </Card>
+                </div>
               )}
 
               {/* Reviews */}
-              {listing.reviews.length > 0 && (
-                <Card className="mt-6 backdrop-blur-md bg-white/10 border border-white/20 p-6 animate-in slide-in-from-bottom duration-500 delay-300">
-                  <h2 className="text-white text-xl font-semibold mb-6">Avis</h2>
-                  <div className="space-y-4">
+              <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6">
+                <h2 className="text-white text-xl font-semibold mb-6 flex items-center gap-2">
+                  <Star className="w-5 h-5 text-yellow-400" /> 
+                  {listing.averageRating} ({listing.reviewCount} avis)
+                </h2>
+                
+                {listing.reviews.length === 0 ? (
+                  <p className="text-slate-400">Aucun avis pour le moment.</p>
+                ) : (
+                  <div className="space-y-6">
                     {listing.reviews.map((review) => (
-                      <div key={review.id} className="border-b border-white/10 pb-4 last:border-0">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-3">
-                            {review.user.image && (
-                              <img
-                                src={review.user.image}
-                                alt={review.user.name}
-                                className="w-8 h-8 rounded-full"
-                              />
-                            )}
-                            <div>
-                              <p className="text-white font-medium">{review.user.name}</p>
-                              <div className="flex items-center gap-1">
-                                {Array(5).fill(0).map((_, i) => (
-                                  <span key={i} className={i < review.rating ? 'text-yellow-400' : 'text-gray-600'}>
-                                    ★
-                                  </span>
-                                ))}
-                              </div>
+                      <div key={review.id} className="border-b border-white/5 pb-6 last:border-0 last:pb-0">
+                        <div className="flex items-center gap-3 mb-3">
+                          {review.user.image ? (
+                            <img src={review.user.image} alt="" className="w-10 h-10 rounded-full object-cover" />
+                          ) : (
+                            <div className="w-10 h-10 bg-slate-700 rounded-full flex items-center justify-center text-white">
+                              {(review.user.name || 'U')[0].toUpperCase()}
+                            </div>
+                          )}
+                          <div>
+                            <p className="text-white font-medium">{review.user.name || 'Anonyme'}</p>
+                            <div className="flex text-yellow-400 text-sm">
+                              {Array(5).fill(0).map((_, i) => <span key={i}>{i < review.rating ? '★' : '☆'}</span>)}
                             </div>
                           </div>
                         </div>
-                        <h4 className="text-white font-semibold mb-1">{review.title}</h4>
-                        <p className="text-blue-100/70 text-sm">{review.comment}</p>
+                        <h4 className="text-white font-medium mb-1">{review.title}</h4>
+                        <p className="text-slate-300 text-sm">{review.comment}</p>
                       </div>
                     ))}
                   </div>
-                </Card>
-              )}
+                )}
+
+                {/* Review Form Component */}
+                {session && <ReviewForm listingId={listing.id} onReviewAdded={fetchListing} />}
+              </div>
+
             </div>
 
-            {/* Booking Card */}
+            {/* Right Column (Booking Box) */}
             <div>
-              <Card className="backdrop-blur-md bg-white/10 border border-white/20 p-6 sticky top-24 space-y-6 animate-in slide-in-from-right duration-500">
-                <div>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-white text-3xl font-bold">{listing.pricePerDay} FCFA</span>
-                    <span className="text-blue-100/70">/nuit</span>
-                  </div>
-                  <div className="flex items-center gap-1 mt-2">
-                    <span className="text-yellow-400">★</span>
-                    <span className="text-white">
-                      {listing.averageRating} ({listing.reviewCount} avis)
-                    </span>
-                  </div>
+              <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 sticky top-24">
+                <div className="mb-6">
+                  <span className="text-3xl font-bold text-white">{listing.pricePerDay} FCFA</span>
+                  <span className="text-slate-400"> / jour</span>
                 </div>
 
-                <form onSubmit={handleBooking} className="space-y-4">
-                  {error && (
-                    <div className="bg-red-500/20 border border-red-500/50 rounded p-3">
-                      <p className="text-red-100 text-sm">{error}</p>
+                <form onSubmit={handleBooking} className="space-y-5">
+                  {bookingError && <div className="p-3 bg-red-500/10 text-red-300 text-sm rounded-xl">{bookingError}</div>}
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-slate-400 text-xs uppercase mb-1">Arrivée</label>
+                      <Input type="date" required value={checkInDate} onChange={e => setCheckInDate(e.target.value)} className="bg-white/5 border-white/10 text-white" />
                     </div>
-                  )}
-
-                  <div>
-                    <label className="block text-white/70 text-sm mb-2">Arrivée</label>
-                    <Input
-                      type="date"
-                      value={bookingData.checkInDate}
-                      onChange={(e) => setBookingData(prev => ({ ...prev, checkInDate: e.target.value }))}
-                      className="bg-white/10 border-white/20 text-white"
-                      required
-                    />
+                    <div>
+                      <label className="block text-slate-400 text-xs uppercase mb-1">Départ</label>
+                      <Input type="date" required value={checkOutDate} onChange={e => setCheckOutDate(e.target.value)} className="bg-white/5 border-white/10 text-white" />
+                    </div>
                   </div>
 
                   <div>
-                    <label className="block text-white/70 text-sm mb-2">Départ</label>
-                    <Input
-                      type="date"
-                      value={bookingData.checkOutDate}
-                      onChange={(e) => setBookingData(prev => ({ ...prev, checkOutDate: e.target.value }))}
-                      className="bg-white/10 border-white/20 text-white"
-                      required
-                    />
+                    <label className="block text-slate-400 text-xs uppercase mb-1">Invités</label>
+                    <Input type="number" min="1" required value={numberOfGuests} onChange={e => setNumberOfGuests(parseInt(e.target.value))} className="bg-white/5 border-white/10 text-white" />
                   </div>
 
                   <div>
-                    <label className="block text-white/70 text-sm mb-2">Nombre d'invités</label>
-                    <Input
-                      type="number"
-                      min="1"
-                      value={bookingData.numberOfGuests}
-                      onChange={(e) => setBookingData(prev => ({ ...prev, numberOfGuests: parseInt(e.target.value) }))}
-                      className="bg-white/10 border-white/20 text-white"
-                      required
+                    <label className="block text-slate-400 text-xs uppercase mb-1">Demandes spéciales</label>
+                    <textarea 
+                      value={specialRequests} onChange={e => setSpecialRequests(e.target.value)}
+                      rows={2} className="w-full bg-white/5 border border-white/10 rounded-md px-3 py-2 text-white placeholder-slate-600 focus:border-cyan-500 outline-none" 
+                      placeholder="Optionnel..."
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-white/70 text-sm mb-2">Demandes spéciales (Optionnel)</label>
-                    <textarea
-                      value={bookingData.specialRequests}
-                      onChange={(e) => setBookingData(prev => ({ ...prev, specialRequests: e.target.value }))}
-                      className="w-full px-3 py-2 bg-white/10 border border-white/20 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none placeholder-white/50"
-                      rows={3}
-                      placeholder="Des demandes particulières ?"
-                    />
-                  </div>
-
-                  <Button
-                    type="submit"
-                    disabled={isBooking}
-                    className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-semibold py-3 transition-transform hover:scale-[1.02]"
-                  >
-                    {isBooking ? 'Réservation...' : 'Réserver Maintenant'}
+                  <Button type="submit" disabled={isBooking} className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white py-6 text-lg rounded-xl shadow-lg shadow-cyan-500/20 hover:scale-[1.02] transition-all">
+                    {isBooking ? 'Patientez...' : 'Demander la réservation'}
                   </Button>
                 </form>
 
-                {/* Host Info */}
-                <div className="border-t border-white/10 pt-4">
-                  <h3 className="text-white font-semibold mb-3">Hébergé par</h3>
+                {/* Host */}
+                <div className="mt-8 pt-6 border-t border-white/10">
                   <div className="flex items-center gap-3">
-                    {listing.landlord.image && (
-                      <img
-                        src={listing.landlord.image}
-                        alt={listing.landlord.name}
-                        className="w-10 h-10 rounded-full"
-                      />
+                    {listing.landlord.image ? (
+                      <img src={listing.landlord.image} alt="" className="w-12 h-12 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-12 h-12 bg-indigo-500 rounded-full flex items-center justify-center text-white font-bold">
+                        {(listing.landlord.name || 'H')[0].toUpperCase()}
+                      </div>
                     )}
                     <div>
-                      <p className="text-white">{listing.landlord.name}</p>
-                      <p className="text-blue-100/70 text-sm">{listing.type}</p>
+                      <p className="text-slate-400 text-xs uppercase">Hébergé par</p>
+                      <p className="text-white font-medium">{listing.landlord.name || 'Propriétaire'}</p>
                     </div>
                   </div>
                 </div>
-              </Card>
+              </div>
             </div>
-          </div>
 
-          {/* Policies */}
-          {(listing.rules || listing.cancellationPolicy) && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-8">
-              {listing.rules && (
-                <Card className="backdrop-blur-md bg-white/10 border border-white/20 p-6 animate-in slide-in-from-bottom duration-500 delay-500">
-                  <h3 className="text-white font-semibold mb-3">Règles de la maison</h3>
-                  <p className="text-blue-100/70 text-sm whitespace-pre-wrap">{listing.rules}</p>
-                </Card>
-              )}
-              {listing.cancellationPolicy && (
-                <Card className="backdrop-blur-md bg-white/10 border border-white/20 p-6 animate-in slide-in-from-bottom duration-500 delay-500">
-                  <h3 className="text-white font-semibold mb-3">Politique d'annulation</h3>
-                  <p className="text-blue-100/70 text-sm whitespace-pre-wrap">{listing.cancellationPolicy}</p>
-                </Card>
-              )}
-            </div>
-          )}
+          </div>
         </div>
       </main>
     </>
