@@ -53,14 +53,21 @@ export default function ProfilePage() {
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    if (!file.type.startsWith('image/')) { setError('Veuillez sélectionner une image.'); return }
+    if (file.size > 5 * 1024 * 1024) { setError('L\'image dépasse 5 Mo.'); return }
     setIsUploadingAvatar(true); setError(''); setSuccess('')
     try {
       const formData = new FormData()
       formData.append('file', file)
       formData.append('folder', 'avatars')
       const res = await fetch('/api/upload', { method: 'POST', body: formData })
-      const json = await res.json()
-      if (!json.success) throw new Error(json.error)
+      let json = null;
+      try {
+        json = await res.json()
+      } catch (err) {
+        throw new Error(`Le fichier est trop volumineux (maximum recommandé: 4 Mo)`)
+      }
+      if (!res.ok || !json.success) throw new Error(json?.error || 'Erreur lors de l\'upload')
 
       // Save URL to user profile
       const patchRes = await fetch('/api/users/me', {

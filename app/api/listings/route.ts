@@ -4,16 +4,16 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 
 const createListingSchema = z.object({
-  title: z.string().min(5),
-  description: z.string().min(20),
-  type: z.enum(["ROOM", "EQUIPMENT", "SPACE"]),
-  location: z.string().min(5),
+  title: z.string({ required_error: "Le titre est requis" }).min(5, "Le titre doit faire au moins 5 caractères"),
+  description: z.string({ required_error: "La description est requise" }).min(20, "La description doit faire au moins 20 caractères"),
+  type: z.enum(["ROOM", "EQUIPMENT", "SPACE"], { required_error: "Le type est invalide" }),
+  location: z.string({ required_error: "La localisation est requise" }).min(5, "La localisation est trop courte"),
   latitude: z.number().optional(),
   longitude: z.number().optional(),
-  pricePerDay: z.number().positive(),
+  pricePerDay: z.number({ required_error: "Le prix par jour est requis", invalid_type_error: "Le prix doit être un nombre" }).positive("Le prix doit être positif"),
   maxOccupants: z.number().int().positive().optional(),
   amenities: z.array(z.string()).default([]),
-  images: z.array(z.string()).default([]),
+  images: z.array(z.string()).min(1, "Veuillez uploader au moins une image"),
   rules: z.string().optional(),
   cancellationPolicy: z.string().optional(),
 })
@@ -22,8 +22,15 @@ export async function POST(req: NextRequest) {
   try {
     const session = await auth()
 
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: "Non autorisé" },
+        { status: 401 }
+      )
+    }
+
     const userRole = (session.user as any).role as string
-    if (!session?.user?.id || !["LANDLORD", "ADMIN"].includes(userRole)) {
+    if (!["LANDLORD", "ADMIN"].includes(userRole)) {
       return NextResponse.json(
         { error: "Seuls les propriétaires peuvent créer des annonces. Vérifiez que votre compte a le rôle LANDLORD." },
         { status: 403 }
@@ -49,8 +56,9 @@ export async function POST(req: NextRequest) {
     )
   } catch (error) {
     if (error instanceof z.ZodError) {
+      const errorMessage = error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ')
       return NextResponse.json(
-        { error: error.errors },
+        { error: errorMessage },
         { status: 400 }
       )
     }

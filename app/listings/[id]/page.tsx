@@ -394,7 +394,9 @@ export default function ListingDetailPage({ params }: { params: { id: string } }
                       <div className="flex items-center gap-1.5">
                         <p className="text-white font-medium">{listing.landlord.name || 'Propriétaire'}</p>
                         {listing.landlord.isVerified && (
-                          <BadgeCheck className="w-4 h-4 text-blue-400" title="Compte vérifié" />
+                          <span title="Compte vérifié">
+                            <BadgeCheck className="w-4 h-4 text-blue-400" />
+                          </span>
                         )}
                       </div>
                       {listing.landlord.email && <p className="text-slate-500 text-xs">{listing.landlord.email}</p>}
