@@ -14,25 +14,12 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'SpaceShare - Room & Equipment Rentals',
-  description: 'Find and book rooms, equipment, and spaces from verified hosts. Flexible scheduling with secure payments.',
-  generator: 'v0.app',
+  title: 'Garden - Location d\'Espaces & Équipements Professionnels',
+  description: 'Réservez des bureaux, salles et équipements professionnels auprès d\'hôtes vérifiés au Togo.',
+  generator: 'Garden AI',
   icons: {
-    icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
-    ],
-    apple: '/apple-icon.png',
+    icon: '/favicon.png',
+    apple: '/favicon.png',
   },
 }
 
