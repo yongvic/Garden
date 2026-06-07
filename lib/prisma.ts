@@ -12,7 +12,7 @@ export const prisma =
   new PrismaClient({
     // @ts-ignore - Prisma 7 constructor typing workaround
     adapter,
-    log: ["query"],
+    log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
   })
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma

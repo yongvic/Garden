@@ -4,12 +4,12 @@ import { NextResponse } from "next/server"
 
 const { auth } = NextAuth(authConfig)
 
-// Routes that require authentication
 const protectedRoutes = [
   "/dashboard",
   "/bookings",
   "/profile",
-  "/listings",
+  "/favorites",
+  "/landlord",
   "/admin",
 ]
 
@@ -20,16 +20,18 @@ export default auth((req) => {
     nextUrl.pathname.startsWith(route)
   )
 
-  // If route is protected and user is not authenticated, redirect to signin
   if (isProtected && !isLoggedIn) {
     const signInUrl = new URL("/auth/signin", nextUrl.origin)
     signInUrl.searchParams.set("callbackUrl", nextUrl.pathname)
     return NextResponse.redirect(signInUrl)
   }
 
-  // Role-based access control
   if (nextUrl.pathname.startsWith("/admin") && req.auth?.user?.role !== "ADMIN") {
     return NextResponse.redirect(new URL("/", nextUrl.origin))
+  }
+
+  if (nextUrl.pathname.startsWith("/landlord") && req.auth?.user?.role !== "LANDLORD" && req.auth?.user?.role !== "ADMIN") {
+    return NextResponse.redirect(new URL("/dashboard", nextUrl.origin))
   }
 
   return NextResponse.next()
@@ -37,13 +39,6 @@ export default auth((req) => {
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - api (API routes)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     */
     "/((?!api|_next/static|_next/image|favicon.ico).*)",
   ],
 }

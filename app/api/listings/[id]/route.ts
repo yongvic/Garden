@@ -112,7 +112,10 @@ export async function PATCH(
       )
     }
 
-    if (listing.landlordId !== session.user.id) {
+    const isOwner = listing.landlordId === session.user.id
+    const isAdmin = session.user.role === "ADMIN"
+
+    if (!isOwner && !isAdmin) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 403 }
@@ -160,7 +163,10 @@ export async function DELETE(
       )
     }
 
-    if (listing.landlordId !== session.user.id) {
+    const isOwner = listing.landlordId === session.user.id
+    const isAdmin = session.user.role === "ADMIN"
+
+    if (!isOwner && !isAdmin) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 403 }

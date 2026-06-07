@@ -4,14 +4,40 @@ import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import Navbar from '@/components/navbar'
+import { PageShell } from '@/components/page-shell'
+import { PageHeader } from '@/components/dashboard/page-header'
+import { EmptyState } from '@/components/dashboard/empty-state'
 import { Button } from '@/components/ui/button'
-import { formatCurrency, formatBookingStatus, getBookingStatusColor, formatDateShort } from '@/lib/format'
-import { ArrowLeft, CheckCircle, XCircle, Eye, Clock, Filter } from 'lucide-react'
+import { Card, CardContent } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
+import { useI18n } from '@/lib/i18n/context'
+import {
+  formatCurrency,
+  formatBookingStatus,
+  getBookingStatusColor,
+  formatDateShort,
+} from '@/lib/format'
+import { toast } from 'sonner'
+import {
+  CheckCircle,
+  XCircle,
+  Eye,
+  Clock,
+  Home,
+  CalendarDays,
+  Users,
+} from 'lucide-react'
+import { motion, AnimatePresence } from 'motion/react'
 
 interface Booking {
-  id: string; bookingNumber: string; status: string; totalPrice: number
-  checkInDate: string; checkOutDate: string; numberOfGuests: number
+  id: string
+  bookingNumber: string
+  status: string
+  totalPrice: number
+  checkInDate: string
+  checkOutDate: string
+  numberOfGuests: number
   listing: { id: string; title: string; images: string[]; location: string }
   customer: { id: string; name: string | null; email: string | null; image: string | null }
 }
@@ -21,36 +47,42 @@ const STATUSES = ['ALL', 'PENDING', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CA
 export default function LandlordBookingsPage() {
   const { data: session, status: authStatus } = useSession()
   const router = useRouter()
+  const { t, locale } = useI18n()
   const [bookings, setBookings] = useState<Booking[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [updatingId, setUpdatingId] = useState<string | null>(null)
-  const [error, setError] = useState('')
 
   useEffect(() => {
-    if (authStatus === 'unauthenticated') { router.push('/auth/signin'); return }
+    if (authStatus === 'unauthenticated') {
+      router.push('/auth/signin')
+      return
+    }
     if (authStatus === 'authenticated') {
-      const role = (session?.user as any)?.role
-      if (role !== 'LANDLORD' && role !== 'ADMIN') { router.push('/dashboard'); return }
+      const role = (session?.user as { role?: string })?.role
+      if (role !== 'LANDLORD' && role !== 'ADMIN') {
+        router.push('/dashboard')
+        return
+      }
     }
   }, [authStatus, session, router])
 
   useEffect(() => {
     if (authStatus !== 'authenticated') return
     setIsLoading(true)
-    const url = statusFilter === 'ALL'
-      ? '/api/landlord/bookings?limit=50'
-      : `/api/landlord/bookings?status=${statusFilter}&limit=50`
+    const url =
+      statusFilter === 'ALL'
+        ? '/api/landlord/bookings?limit=50'
+        : `/api/landlord/bookings?status=${statusFilter}&limit=50`
     fetch(url)
-      .then(r => r.json())
-      .then(data => setBookings(data.bookings ?? []))
-      .catch(console.error)
+      .then((r) => r.json())
+      .then((data) => setBookings(data.bookings ?? []))
+      .catch(() => toast.error(t.common.error))
       .finally(() => setIsLoading(false))
-  }, [authStatus, statusFilter])
+  }, [authStatus, statusFilter, t.common.error])
 
   const handleStatusUpdate = async (bookingId: string, newStatus: string) => {
     setUpdatingId(bookingId)
-    setError('')
     try {
       const res = await fetch(`/api/bookings/${bookingId}`, {
         method: 'PATCH',
@@ -58,98 +90,135 @@ export default function LandlordBookingsPage() {
         body: JSON.stringify({ status: newStatus }),
       })
       if (!res.ok) throw new Error((await res.json()).error)
-      setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: newStatus } : b))
-    } catch (e) { setError((e as Error).message) }
-    finally { setUpdatingId(null) }
+      setBookings((prev) =>
+        prev.map((b) => (b.id === bookingId ? { ...b, status: newStatus } : b))
+      )
+      toast.success(t.common.success)
+    } catch (e) {
+      toast.error((e as Error).message)
+    } finally {
+      setUpdatingId(null)
+    }
   }
 
   return (
-    <><Navbar />
-      <main className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 pt-24 pb-12">
-        <div className="fixed inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-40 left-1/4 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl" />
-        </div>
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+    <PageShell>
+      <div className="mx-auto max-w-7xl space-y-6 px-4 py-10 sm:px-6 lg:px-8">
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
+          <PageHeader
+            title={t.landlord.bookingsTitle}
+            description={t.landlord.bookingsSubtitle}
+            backHref="/landlord/dashboard"
+            backLabel={t.nav.dashboard}
+          />
+        </motion.div>
 
-          <Link href="/landlord/dashboard" className="flex items-center gap-2 text-slate-400 hover:text-white text-sm transition-colors">
-            <ArrowLeft className="w-4 h-4" /> Retour au tableau de bord
-          </Link>
+        <motion.div 
+          className="flex flex-wrap gap-2"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          {STATUSES.map((s) => (
+            <Button
+              key={s}
+              size="sm"
+              variant={statusFilter === s ? 'default' : 'outline'}
+              onClick={() => setStatusFilter(s)}
+            >
+              {s === 'ALL' ? t.bookings.all : formatBookingStatus(s, locale)}
+            </Button>
+          ))}
+        </motion.div>
 
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div>
-              <h1 className="text-3xl font-bold text-white">Réservations reçues</h1>
-              <p className="text-slate-400 mt-1">Gérez les demandes de vos clients</p>
-            </div>
-          </div>
-
-          {/* Filters */}
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            <Filter className="w-4 h-4 text-slate-500 shrink-0 mt-2" />
-            {STATUSES.map(s => (
-              <button
-                key={s}
-                onClick={() => setStatusFilter(s)}
-                className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                  statusFilter === s
-                    ? 'bg-emerald-500 text-white'
-                    : 'bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10'
-                }`}
-              >
-                {s === 'ALL' ? 'Toutes' : formatBookingStatus(s)}
-              </button>
+        {isLoading ? (
+          <div className="space-y-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-32 rounded-2xl" />
             ))}
           </div>
-
-          {error && (
-            <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-red-300 text-sm">{error}</div>
-          )}
-
-          {/* Bookings list */}
-          {isLoading ? (
-            <div className="flex justify-center py-20">
-              <div className="w-10 h-10 border-2 border-emerald-400/30 border-t-emerald-400 rounded-full animate-spin" />
-            </div>
-          ) : bookings.length === 0 ? (
-            <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-16 text-center">
-              <Clock className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-              <p className="text-slate-400">Aucune réservation trouvée.</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {bookings.map(booking => (
-                <div key={booking.id} className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-5 hover:border-white/20 transition-all">
-                  <div className="flex items-start gap-4 flex-wrap">
-                    {/* Listing image */}
+        ) : bookings.length === 0 ? (
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
+            <EmptyState icon={Clock} title={t.landlord.noBookings} />
+          </motion.div>
+        ) : (
+          <motion.div 
+            className="space-y-4"
+            initial="hidden"
+            animate="show"
+            variants={{
+              hidden: { opacity: 0 },
+              show: { opacity: 1, transition: { staggerChildren: 0.05 } }
+            }}
+          >
+            <AnimatePresence mode="popLayout">
+              {bookings.map((booking) => (
+                <motion.div
+                  key={booking.id}
+                  layout
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <Card className="transition-colors hover:border-primary/20 hover:shadow-sm">
+                <CardContent className="p-5">
+                  <div className="flex flex-wrap items-start gap-4">
                     {booking.listing.images?.[0] ? (
-                      <img src={booking.listing.images[0]} alt="" className="w-16 h-16 rounded-xl object-cover shrink-0" />
+                      <img
+                        src={booking.listing.images[0]}
+                        alt=""
+                        className="size-16 shrink-0 rounded-xl object-cover"
+                      />
                     ) : (
-                      <div className="w-16 h-16 bg-gradient-to-br from-emerald-500/20 to-teal-500/20 rounded-xl shrink-0" />
+                      <div className="flex size-16 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                        <Home className="size-6 text-primary" />
+                      </div>
                     )}
 
-                    {/* Info */}
-                    <div className="flex-1 min-w-0 space-y-1">
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <h3 className="text-white font-semibold truncate">{booking.listing.title}</h3>
-                        <span className={`text-xs px-2 py-1 rounded-full border ${getBookingStatusColor(booking.status)}`}>
-                          {formatBookingStatus(booking.status)}
-                        </span>
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <h3 className="truncate font-semibold">{booking.listing.title}</h3>
+                        <Badge
+                          variant="outline"
+                          className={getBookingStatusColor(booking.status)}
+                        >
+                          {formatBookingStatus(booking.status, locale)}
+                        </Badge>
                       </div>
-                      <p className="text-slate-400 text-sm">
-                        Client : <span className="text-slate-300">{booking.customer.name ?? '—'}</span>
-                        <span className="text-slate-600"> · {booking.customer.email}</span>
+                      <p className="text-sm text-muted-foreground">
+                        {booking.customer.name ?? '—'}
+                        {booking.customer.email && (
+                          <span className="text-muted-foreground/70">
+                            {' '}
+                            · {booking.customer.email}
+                          </span>
+                        )}
                       </p>
-                      <p className="text-slate-400 text-sm">
-                        📅 {formatDateShort(booking.checkInDate)} → {formatDateShort(booking.checkOutDate)}
-                        <span className="text-slate-600 ml-2">· {booking.numberOfGuests} personne{booking.numberOfGuests > 1 ? 's' : ''}</span>
+                      <p className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
+                        <span className="inline-flex items-center gap-1">
+                          <CalendarDays className="size-3.5" />
+                          {formatDateShort(booking.checkInDate, locale)} →{' '}
+                          {formatDateShort(booking.checkOutDate, locale)}
+                        </span>
+                        <span className="inline-flex items-center gap-1">
+                          <Users className="size-3.5" />
+                          {booking.numberOfGuests}{' '}
+                          {booking.numberOfGuests > 1
+                            ? t.bookings.guestsPlural
+                            : t.bookings.guests}
+                        </span>
                       </p>
-                      <p className="text-emerald-400 font-semibold">{formatCurrency(booking.totalPrice)}</p>
+                      <p className="font-semibold text-primary">
+                        {formatCurrency(booking.totalPrice, locale)}
+                      </p>
                     </div>
 
-                    {/* Actions */}
-                    <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                    <div className="flex shrink-0 flex-wrap items-center gap-2">
                       <Link href={`/bookings/${booking.id}`}>
-                        <Button size="sm" variant="outline" className="gap-1 border-white/20 text-slate-300 hover:bg-white/10 hover:text-white">
-                          <Eye className="w-4 h-4" /> Détail
+                        <Button size="sm" variant="outline" className="gap-1 transition-transform active:scale-95">
+                          <Eye className="size-4" />
+                          {t.bookings.detail}
                         </Button>
                       </Link>
                       {booking.status === 'PENDING' && (
@@ -158,42 +227,45 @@ export default function LandlordBookingsPage() {
                             size="sm"
                             onClick={() => handleStatusUpdate(booking.id, 'CONFIRMED')}
                             disabled={updatingId === booking.id}
-                            className="gap-1 bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/30"
+                            className="gap-1 transition-transform active:scale-95"
                           >
-                            <CheckCircle className="w-4 h-4" />
-                            {updatingId === booking.id ? '...' : 'Confirmer'}
+                            <CheckCircle className="size-4" />
+                            {updatingId === booking.id ? '…' : t.landlord.confirm}
                           </Button>
                           <Button
                             size="sm"
+                            variant="outline"
                             onClick={() => handleStatusUpdate(booking.id, 'CANCELLED')}
                             disabled={updatingId === booking.id}
-                            variant="outline"
-                            className="gap-1 border-red-500/40 text-red-400 hover:bg-red-500/10"
+                            className="gap-1 text-destructive hover:bg-destructive/10 hover:text-destructive transition-transform active:scale-95"
                           >
-                            <XCircle className="w-4 h-4" />
-                            {updatingId === booking.id ? '...' : 'Refuser'}
+                            <XCircle className="size-4" />
+                            {updatingId === booking.id ? '…' : t.landlord.reject}
                           </Button>
                         </>
                       )}
                       {booking.status === 'CONFIRMED' && (
                         <Button
                           size="sm"
+                          variant="secondary"
                           onClick={() => handleStatusUpdate(booking.id, 'COMPLETED')}
                           disabled={updatingId === booking.id}
-                          className="gap-1 bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/30"
+                          className="gap-1 transition-transform active:scale-95"
                         >
-                          <CheckCircle className="w-4 h-4" />
-                          {updatingId === booking.id ? '...' : 'Terminer'}
+                          <CheckCircle className="size-4" />
+                          {updatingId === booking.id ? '…' : t.landlord.markComplete}
                         </Button>
                       )}
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </main>
-    </>
+                </CardContent>
+              </Card>
+              </motion.div>
+            ))}
+            </AnimatePresence>
+          </motion.div>
+        )}
+      </div>
+    </PageShell>
   )
 }

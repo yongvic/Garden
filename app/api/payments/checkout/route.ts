@@ -71,13 +71,13 @@ export async function POST(req: NextRequest) {
       line_items: [
         {
           price_data: {
-            currency: "usd",
+            currency: "xof",
             product_data: {
               name: booking.listing.title,
-              images: booking.listing.images,
+              images: booking.listing.images.slice(0, 1),
               description: `Booking from ${booking.checkInDate.toDateString()} to ${booking.checkOutDate.toDateString()}`,
             },
-            unit_amount: Math.round(booking.totalPrice * 100), // Convert to cents
+            unit_amount: Math.round(booking.totalPrice),
           },
           quantity: 1,
         },

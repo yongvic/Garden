@@ -1,131 +1,127 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Card } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
+import { useI18n } from '@/lib/i18n/context'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { motion } from 'motion/react'
 
-import { Suspense } from 'react'
+const signInSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+})
 
-function SignInContent() {
+type SignInValues = z.infer<typeof signInSchema>
+
+function SignInForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const callbackUrl = searchParams.get('callbackUrl') || '/dashboard'
-
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const { t } = useI18n()
   const [error, setError] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const form = useForm<SignInValues>({
+    resolver: zodResolver(signInSchema),
+    defaultValues: { email: '', password: '' },
+  })
+
+  const onSubmit = async (values: SignInValues) => {
     setError('')
-    setIsLoading(true)
+    const result = await signIn('credentials', {
+      email: values.email,
+      password: values.password,
+      redirect: false,
+    })
 
-    try {
-      const result = await signIn('credentials', {
-        email,
-        password,
-        redirect: false,
-      })
-
-      if (result?.error) {
-        setError('Email ou mot de passe incorrect')
-      } else if (result?.ok) {
-        router.push(callbackUrl)
-      }
-    } catch (err) {
-      setError('Une erreur est survenue. Veuillez réessayer.')
-    } finally {
-      setIsLoading(false)
+    if (result?.error) {
+      setError(t.auth.errors.generic)
+      return
     }
+
+    router.push(callbackUrl)
+    router.refresh()
   }
 
   return (
-    <Card className="relative w-full max-w-md backdrop-blur-xl bg-white/10 border border-white/20 shadow-2xl animate-in fade-in zoom-in duration-500">
-      <div className="p-8">
-        <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-white mb-2">Bon retour</h1>
-          <p className="text-blue-100/70">Connectez-vous à votre compte pour continuer</p>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      className="w-full max-w-md"
+    >
+      <Card className="border-border shadow-lg">
+        <CardHeader className="text-center">
+        <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
+          <span className="font-display text-xl">G</span>
         </div>
-
+        <CardTitle className="text-2xl">{t.auth.signInTitle}</CardTitle>
+        <CardDescription>{t.auth.signInSubtitle}</CardDescription>
+      </CardHeader>
+      <CardContent>
         {error && (
-          <div className="mb-6 p-4 bg-red-500/20 border border-red-500/50 rounded-lg animate-in fade-in slide-in-from-top duration-300">
-            <p className="text-red-100 text-sm">{error}</p>
-          </div>
+          <Alert variant="destructive" className="mb-6">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
         )}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-blue-100 mb-2">
-              Adresse Email
-            </label>
-            <Input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="vous@exemple.com"
-              className="bg-white/10 border-white/20 text-white placeholder-white/50 focus:border-cyan-400 focus:ring-cyan-400/20 transition-all"
-              required
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t.auth.email}</FormLabel>
+                  <FormControl>
+                    <Input type="email" placeholder="vous@exemple.com" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-blue-100 mb-2">
-              Mot de passe
-            </label>
-            <Input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="bg-white/10 border-white/20 text-white placeholder-white/50 focus:border-cyan-400 focus:ring-cyan-400/20 transition-all"
-              required
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t.auth.password}</FormLabel>
+                  <FormControl>
+                    <Input type="password" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
-
-          <Button
-            type="submit"
-            disabled={isLoading}
-            className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-semibold py-2 rounded-lg transition-all hover:scale-[1.02] shadow-lg hover:shadow-cyan-500/20"
-          >
-            {isLoading ? 'Connexion en cours...' : 'Se connecter'}
-          </Button>
-        </form>
-
-        <div className="mt-6 pt-6 border-t border-white/10">
-          <p className="text-blue-100/70 text-sm text-center mb-4">
-            Pas encore de compte ?
-          </p>
-          <Link href="/auth/register">
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full bg-white/10 border-white/20 text-white hover:bg-white/20 hover:scale-[1.02] transition-all backdrop-blur-sm"
-            >
-              Créer un compte
+            <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
+              {form.formState.isSubmitting ? t.auth.loading : t.auth.signIn}
             </Button>
+          </form>
+        </Form>
+        <p className="mt-6 text-center text-sm text-muted-foreground">
+          {t.auth.noAccount}{' '}
+          <Link href="/auth/register" className="font-medium text-primary hover:underline">
+            {t.auth.signUp}
           </Link>
-        </div>
-      </div>
+        </p>
+      </CardContent>
     </Card>
+    </motion.div>
   )
 }
 
 export default function SignInPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center p-4">
-      {/* Glassmorphism background elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-20 left-20 w-72 h-72 bg-blue-500/10 rounded-full blur-3xl animate-pulse duration-[4000ms]"></div>
-        <div className="absolute bottom-20 right-20 w-72 h-72 bg-cyan-500/10 rounded-full blur-3xl animate-pulse duration-[5000ms]"></div>
-      </div>
-
-      <Suspense fallback={<div className="text-white">Chargement...</div>}>
-        <SignInContent />
+    <div className="flex min-h-dvh items-center justify-center garden-surface px-4 py-12">
+      <Suspense fallback={<div className="text-muted-foreground">…</div>}>
+        <SignInForm />
       </Suspense>
     </div>
   )

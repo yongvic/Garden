@@ -2,27 +2,15 @@
 
 import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import Link from 'next/link'
-import Navbar from '@/components/navbar'
+import { PageShell } from '@/components/page-shell'
+import { ListingCard, type ListingCardData } from '@/components/listing-card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Card } from '@/components/ui/card'
-
-interface Listing {
-  id: string
-  title: string
-  description: string
-  type: string
-  location: string
-  pricePerDay: number
-  images: string[]
-  averageRating: number
-  reviewCount: number
-  landlord: {
-    name: string
-    image: string
-  }
-}
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
+import { useI18n } from '@/lib/i18n/context'
+import { motion, AnimatePresence } from 'motion/react'
 
 interface PaginationData {
   total: number
@@ -34,10 +22,11 @@ interface PaginationData {
 function SearchContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { t } = useI18n()
 
-  const [listings, setListings] = useState<Listing[]>([])
+  const [listings, setListings] = useState<ListingCardData[]>([])
   const [pagination, setPagination] = useState<PaginationData | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
 
   const [filters, setFilters] = useState({
     location: searchParams.get('location') || '',
@@ -60,21 +49,19 @@ function SearchContent() {
 
         const res = await fetch(`/api/listings?${params}`)
         const data = await res.json()
-
-        setListings(data.listings)
-        setPagination(data.pagination)
-      } catch (err) {
-        console.error('Failed to fetch listings:', err)
+        setListings(data.listings ?? [])
+        setPagination(data.pagination ?? null)
+      } catch {
+        setListings([])
       } finally {
         setIsLoading(false)
       }
     }
-
     fetchListings()
   }, [filters])
 
   const handleFilterChange = (key: string, value: string) => {
-    setFilters(prev => ({ ...prev, [key]: value, page: 1 }))
+    setFilters((prev) => ({ ...prev, [key]: value, page: 1 }))
   }
 
   const handleSearch = () => {
@@ -87,150 +74,121 @@ function SearchContent() {
   }
 
   return (
-    <div className="relative max-w-7xl mx-auto px-4 py-12">
-      {/* Filter Section */}
-      <Card className="mb-8 backdrop-blur-md bg-white/10 border border-white/20 p-6 animate-in fade-in slide-in-from-top duration-500">
-        <h2 className="text-white text-xl font-semibold mb-6">Filtrer les Annonces</h2>
+    <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+      <motion.div 
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="mb-10"
+      >
+        <h1 className="font-display text-3xl tracking-tight sm:text-4xl">{t.search.title}</h1>
+      </motion.div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          <div>
-            <label className="block text-white/70 text-sm mb-2">Localisation</label>
+      <motion.div 
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="mb-10 rounded-2xl border border-border bg-card p-6 shadow-sm"
+      >
+        <p className="mb-5 text-sm font-medium">{t.search.filters}</p>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
+          <div className="space-y-2">
+            <Label htmlFor="location">{t.search.location}</Label>
             <Input
-              type="text"
-              placeholder="Ville ou quartier"
+              id="location"
               value={filters.location}
               onChange={(e) => handleFilterChange('location', e.target.value)}
-              className="bg-white/10 border-white/20 text-white placeholder-white/50"
+              placeholder="Lomé, Accra…"
             />
           </div>
-
-          <div>
-            <label className="block text-white/70 text-sm mb-2">Type</label>
-            <select
-              value={filters.type}
-              onChange={(e) => handleFilterChange('type', e.target.value)}
-              className="w-full px-3 py-2 bg-white/10 border border-white/20 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Tous Types</option>
-              <option value="ROOM">Chambre</option>
-              <option value="EQUIPMENT">Équipement</option>
-              <option value="SPACE">Espace</option>
-            </select>
+          <div className="space-y-2">
+            <Label>{t.search.type}</Label>
+            <Select value={filters.type || 'all'} onValueChange={(v) => handleFilterChange('type', v === 'all' ? '' : v)}>
+              <SelectTrigger><SelectValue placeholder={t.search.allTypes} /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t.search.allTypes}</SelectItem>
+                <SelectItem value="SPACE">{t.listing.types.SPACE}</SelectItem>
+                <SelectItem value="ROOM">{t.listing.types.ROOM}</SelectItem>
+                <SelectItem value="EQUIPMENT">{t.listing.types.EQUIPMENT}</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-
-          <div>
-            <label className="block text-white/70 text-sm mb-2">Prix Min (FCFA)</label>
+          <div className="space-y-2">
+            <Label htmlFor="minPrice">{t.search.minPrice}</Label>
             <Input
+              id="minPrice"
               type="number"
-              placeholder="0"
               value={filters.minPrice}
               onChange={(e) => handleFilterChange('minPrice', e.target.value)}
-              className="bg-white/10 border-white/20 text-white placeholder-white/50"
+              placeholder="0"
             />
           </div>
-
-          <div>
-            <label className="block text-white/70 text-sm mb-2">Prix Max (FCFA)</label>
+          <div className="space-y-2">
+            <Label htmlFor="maxPrice">{t.search.maxPrice}</Label>
             <Input
+              id="maxPrice"
               type="number"
-              placeholder="100000"
               value={filters.maxPrice}
               onChange={(e) => handleFilterChange('maxPrice', e.target.value)}
-              className="bg-white/10 border-white/20 text-white placeholder-white/50"
+              placeholder="500000"
             />
           </div>
-
           <div className="flex items-end">
-            <Button
-              onClick={handleSearch}
-              className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white"
-            >
-              Rechercher
-            </Button>
+            <Button onClick={handleSearch} className="w-full">{t.search.search}</Button>
           </div>
         </div>
-      </Card>
+      </motion.div>
 
-      {/* Results */}
       {isLoading ? (
-        <div className="text-center py-12">
-          <p className="text-white/70">Chargement des annonces...</p>
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="space-y-3">
+              <Skeleton className="aspect-[4/3] w-full rounded-2xl" />
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-4 w-1/2" />
+            </div>
+          ))}
         </div>
       ) : listings.length > 0 ? (
         <>
-          <div className="mb-6 animate-in fade-in duration-500">
-            <p className="text-white/70">
-              <span className="text-white font-semibold">{pagination?.total}</span> annonces trouvées
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-            {listings.map((listing, idx) => (
-              <Link key={listing.id} href={`/listings/${listing.id}`}>
-                <Card
-                  className="h-full backdrop-blur-md bg-white/10 border border-white/20 overflow-hidden hover:border-white/40 transition-all cursor-pointer group hover:-translate-y-1 animate-in fade-in slide-in-from-bottom duration-500"
-                  style={{ animationDelay: `${idx * 100}ms` }}
+          <p className="mb-6 text-sm text-muted-foreground">
+            <span className="font-semibold text-foreground tabular-nums">{pagination?.total}</span>{' '}
+            {t.search.results}
+          </p>
+          <motion.div 
+            className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
+            initial="hidden"
+            animate="show"
+            variants={{
+              hidden: { opacity: 0 },
+              show: {
+                opacity: 1,
+                transition: { staggerChildren: 0.1 }
+              }
+            }}
+          >
+            <AnimatePresence mode="popLayout">
+              {listings.map((listing) => (
+                <motion.div
+                  key={listing.id}
+                  layout
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  transition={{ duration: 0.3 }}
                 >
-                  {listing.images.length > 0 && (
-                    <div className="relative h-48 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 overflow-hidden">
-                      <img
-                        src={listing.images[0]}
-                        alt={listing.title}
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                      />
-                    </div>
-                  )}
-
-                  <div className="p-4 space-y-3">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h3 className="text-white font-semibold truncate">{listing.title}</h3>
-                        <p className="text-blue-100/70 text-sm">{listing.location}</p>
-                      </div>
-                      <span className="bg-white/10 text-white/70 text-xs px-2 py-1 rounded">
-                        {listing.type === 'ROOM' ? 'Chambre' : listing.type === 'EQUIPMENT' ? 'Équipement' : 'Espace'}
-                      </span>
-                    </div>
-
-                    <p className="text-blue-100/60 text-sm line-clamp-2">{listing.description}</p>
-
-                    <div className="flex items-center justify-between">
-                      <p className="text-white font-semibold">{listing.pricePerDay} FCFA/jour</p>
-                      <div className="flex items-center gap-1">
-                        <span className="text-yellow-400">★</span>
-                        <span className="text-white/70 text-sm">
-                          {listing.averageRating} ({listing.reviewCount})
-                        </span>
-                      </div>
-                    </div>
-
-                    {listing.landlord && (
-                      <div className="flex items-center gap-2 pt-2 border-t border-white/10">
-                        {listing.landlord.image && (
-                          <img
-                            src={listing.landlord.image}
-                            alt={listing.landlord.name}
-                            className="w-6 h-6 rounded-full"
-                          />
-                        )}
-                        <span className="text-white/70 text-sm">{listing.landlord.name}</span>
-                      </div>
-                    )}
-                  </div>
-                </Card>
-              </Link>
-            ))}
-          </div>
-
-          {/* Pagination */}
+                  <ListingCard listing={listing} />
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </motion.div>
           {pagination && pagination.pages > 1 && (
-            <div className="flex justify-center gap-2">
+            <div className="mt-10 flex justify-center gap-2">
               {Array.from({ length: pagination.pages }, (_, i) => i + 1).map((page) => (
                 <Button
                   key={page}
-                  onClick={() => setFilters(prev => ({ ...prev, page }))}
                   variant={page === filters.page ? 'default' : 'outline'}
-                  className={page === filters.page ? 'bg-gradient-to-r from-blue-500 to-cyan-500' : 'border-white/20 text-white hover:bg-white/10'}
+                  size="sm"
+                  onClick={() => setFilters((prev) => ({ ...prev, page }))}
                 >
                   {page}
                 </Button>
@@ -239,8 +197,8 @@ function SearchContent() {
           )}
         </>
       ) : (
-        <div className="text-center py-12">
-          <p className="text-white/70">Aucune annonce trouvée. Essayez d'ajuster vos filtres.</p>
+        <div className="rounded-2xl border border-dashed border-border py-20 text-center">
+          <p className="text-muted-foreground">{t.search.empty}</p>
         </div>
       )}
     </div>
@@ -248,24 +206,12 @@ function SearchContent() {
 }
 
 export default function SearchPage() {
+  const { t } = useI18n()
   return (
-    <>
-      <Navbar />
-      <main className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 pt-20">
-        {/* Background elements */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-20 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse duration-[4000ms]"></div>
-          <div className="absolute bottom-20 right-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl animate-pulse duration-[5000ms]"></div>
-        </div>
-
-        <Suspense fallback={
-          <div className="min-h-screen flex items-center justify-center">
-            <p className="text-white/70">Chargement...</p>
-          </div>
-        }>
-          <SearchContent />
-        </Suspense>
-      </main>
-    </>
+    <PageShell>
+      <Suspense fallback={<div className="p-10 text-muted-foreground">{t.common.loading}</div>}>
+        <SearchContent />
+      </Suspense>
+    </PageShell>
   )
 }

@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
         where: {
           listingId,
           status: {
-            in: ["CONFIRMED", "IN_PROGRESS"],
+            in: ["PENDING", "CONFIRMED", "IN_PROGRESS"],
           },
           OR: [
             {

@@ -4,9 +4,14 @@ import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import Navbar from '@/components/navbar'
-import { Card } from '@/components/ui/card'
+import { PageShell } from '@/components/page-shell'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
+import { useI18n } from '@/lib/i18n/context'
+import { formatCurrency, formatDateRange, getBookingStatusColor, formatBookingStatus } from '@/lib/format'
+import { toast } from 'sonner'
+import { motion, AnimatePresence } from 'motion/react'
 
 interface Booking {
   id: string
@@ -16,6 +21,7 @@ interface Booking {
   checkOutDate: string
   totalPrice: number
   numberOfGuests: number
+  paymentStatus: string
   listing: {
     id: string
     title: string
@@ -27,165 +33,162 @@ interface Booking {
 export default function BookingsPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const { t, locale } = useI18n()
   const [bookings, setBookings] = useState<Booking[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('ALL')
+  const [payingId, setPayingId] = useState<string | null>(null)
 
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/auth/signin')
       return
     }
-
-    if (status === 'authenticated') {
-      fetchBookings()
-    }
+    if (status === 'authenticated') fetchBookings()
   }, [status, statusFilter])
 
   const fetchBookings = async () => {
+    setIsLoading(true)
     try {
-      const url = statusFilter === 'ALL' 
-        ? '/api/bookings'
-        : `/api/bookings?status=${statusFilter}`
-      
+      const url = statusFilter === 'ALL' ? '/api/bookings' : `/api/bookings?status=${statusFilter}`
       const res = await fetch(url)
-      if (!res.ok) throw new Error('Failed to fetch')
-      
+      if (!res.ok) throw new Error('Failed')
       const data = await res.json()
       setBookings(data.bookings || data)
-    } catch (err) {
-      console.error('Error fetching bookings:', err)
+    } catch {
+      setBookings([])
     } finally {
       setIsLoading(false)
     }
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'PENDING':
-        return 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30'
-      case 'CONFIRMED':
-        return 'bg-green-500/20 text-green-300 border-green-500/30'
-      case 'IN_PROGRESS':
-        return 'bg-blue-500/20 text-blue-300 border-blue-500/30'
-      case 'COMPLETED':
-        return 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
-      case 'CANCELLED':
-        return 'bg-red-500/20 text-red-300 border-red-500/30'
-      default:
-        return 'bg-gray-500/20 text-gray-300 border-gray-500/30'
+  const handlePay = async (bookingId: string) => {
+    setPayingId(bookingId)
+    try {
+      const res = await fetch('/api/payments/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookingId }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      if (data.url) window.location.href = data.url
+    } catch (err) {
+      toast.error((err as Error).message)
+    } finally {
+      setPayingId(null)
     }
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    })
-  }
+  const statuses = ['ALL', 'PENDING', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']
 
   return (
-    <>
-      <Navbar />
-      <main className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 pt-20">
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-20 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl"></div>
-          <div className="absolute bottom-20 right-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl"></div>
-        </div>
+    <PageShell>
+      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <h1 className="font-display text-3xl tracking-tight">{t.bookings.title}</h1>
+        </motion.div>
 
-        <div className="relative max-w-6xl mx-auto px-4 py-12">
-          <div className="mb-8">
-            <h1 className="text-4xl font-bold text-white mb-2">My Bookings</h1>
-            <p className="text-blue-100/70">Manage and track all your reservations</p>
-          </div>
+        <motion.div 
+          className="mt-6 flex flex-wrap gap-2"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          {statuses.map((s) => (
+            <Button
+              key={s}
+              size="sm"
+              variant={statusFilter === s ? 'default' : 'outline'}
+              onClick={() => setStatusFilter(s)}
+            >
+              {s === 'ALL' ? t.bookings.all : formatBookingStatus(s, locale)}
+            </Button>
+          ))}
+        </motion.div>
 
-          {/* Filter Buttons */}
-          <div className="flex gap-2 mb-8 overflow-x-auto pb-2">
-            {['ALL', 'PENDING', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'].map((status) => (
-              <Button
-                key={status}
-                onClick={() => setStatusFilter(status)}
-                className={`whitespace-nowrap ${
-                  statusFilter === status
-                    ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
-                    : 'bg-white/10 border border-white/20 text-white hover:bg-white/20'
-                }`}
-              >
-                {status}
-              </Button>
+        {isLoading ? (
+          <div className="mt-10 space-y-4">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-32 w-full rounded-2xl" />
             ))}
           </div>
-
-          {/* Bookings List */}
-          {isLoading ? (
-            <div className="text-center py-12">
-              <p className="text-white/70">Loading bookings...</p>
-            </div>
-          ) : bookings.length > 0 ? (
-            <div className="space-y-4">
+        ) : bookings.length === 0 ? (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="mt-16 rounded-2xl border border-dashed border-border py-20 text-center"
+          >
+            <p className="text-muted-foreground">{t.bookings.empty}</p>
+            <Link href="/search" className="mt-6 inline-block">
+              <Button variant="outline" className="transition-transform active:scale-95">{t.bookings.emptyCta}</Button>
+            </Link>
+          </motion.div>
+        ) : (
+          <motion.div 
+            className="mt-10 space-y-4"
+            initial="hidden"
+            animate="show"
+            variants={{
+              hidden: { opacity: 0 },
+              show: { opacity: 1, transition: { staggerChildren: 0.05 } }
+            }}
+          >
+            <AnimatePresence mode="popLayout">
               {bookings.map((booking) => (
-                <Link key={booking.id} href={`/bookings/${booking.id}`}>
-                  <Card className="backdrop-blur-md bg-white/10 border border-white/20 hover:border-white/40 transition-all p-6 cursor-pointer group">
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
-                      {/* Image and Title */}
-                      <div className="md:col-span-2 flex gap-4">
-                        {booking.listing.images.length > 0 && (
-                          <div className="w-24 h-24 rounded-lg overflow-hidden bg-gradient-to-br from-blue-500/20 to-cyan-500/20">
-                            <img
-                              src={booking.listing.images[0]}
-                              alt={booking.listing.title}
-                              className="w-full h-full object-cover group-hover:scale-110 transition-transform"
-                            />
-                          </div>
-                        )}
-                        <div className="flex-1">
-                          <h3 className="text-white font-semibold mb-1">{booking.listing.title}</h3>
-                          <p className="text-blue-100/70 text-sm mb-2">{booking.listing.location}</p>
-                          <p className="text-white/50 text-sm">
-                            Booking #{booking.bookingNumber}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Dates */}
-                      <div>
-                        <p className="text-white/70 text-sm mb-1">Dates</p>
-                        <p className="text-white text-sm font-medium">
-                          {formatDate(booking.checkInDate)} to {formatDate(booking.checkOutDate)}
-                        </p>
-                      </div>
-
-                      {/* Status and Price */}
-                      <div className="flex flex-col items-end gap-2">
-                        <span
-                          className={`px-3 py-1 rounded-full border text-xs font-medium ${getStatusColor(
-                            booking.status
-                          )}`}
-                        >
-                          {booking.status}
-                        </span>
-                        <p className="text-white font-semibold">
-                          ${booking.totalPrice.toFixed(2)}
-                        </p>
-                      </div>
-                    </div>
-                  </Card>
-                </Link>
+                <motion.article
+                  key={booking.id}
+                  layout
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  className="group flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 sm:flex-row sm:items-center transition-colors hover:border-primary/30 hover:shadow-sm"
+                >
+                  {booking.listing.images[0] && (
+                    <img
+                      src={booking.listing.images[0]}
+                      alt=""
+                      className="h-24 w-full rounded-xl object-cover sm:w-32 transition-transform group-hover:scale-[1.02]"
+                    />
+                  )}
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="font-semibold truncate">{booking.listing.title}</h2>
+                    <Badge variant="outline" className={getBookingStatusColor(booking.status)}>
+                      {formatBookingStatus(booking.status, locale)}
+                    </Badge>
+                  </div>
+                  <p className="mt-1 text-sm text-muted-foreground">{booking.listing.location}</p>
+                  <p className="mt-2 text-sm">
+                    {formatDateRange(booking.checkInDate, booking.checkOutDate, locale)}
+                    {' · '}
+                    <span className="font-medium tabular-nums">{formatCurrency(booking.totalPrice, locale)}</span>
+                  </p>
+                </div>
+                <div className="flex shrink-0 flex-col gap-2 sm:items-end">
+                  <Link href={`/bookings/${booking.id}`}>
+                    <Button variant="outline" size="sm" className="transition-transform active:scale-95">{t.bookings.detail}</Button>
+                  </Link>
+                  {booking.status === 'PENDING' && booking.paymentStatus === 'pending' && (
+                    <Button
+                      size="sm"
+                      disabled={payingId === booking.id}
+                      onClick={() => handlePay(booking.id)}
+                      className="transition-transform active:scale-95"
+                    >
+                      {payingId === booking.id ? t.common.loading : t.bookings.pay}
+                    </Button>
+                  )}
+                </div>
+                </motion.article>
               ))}
-            </div>
-          ) : (
-            <Card className="backdrop-blur-md bg-white/10 border border-white/20 p-12 text-center">
-              <p className="text-white/70 text-lg mb-4">No bookings found</p>
-              <Link href="/search">
-                <Button className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white">
-                  Browse Listings
-                </Button>
-              </Link>
-            </Card>
-          )}
-        </div>
-      </main>
-    </>
+            </AnimatePresence>
+          </motion.div>
+        )}
+      </div>
+    </PageShell>
   )
 }

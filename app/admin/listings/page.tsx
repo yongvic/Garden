@@ -4,11 +4,25 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
-import Navbar from '@/components/navbar'
-import { Card } from '@/components/ui/card'
+import { PageShell } from '@/components/page-shell'
+import { PageHeader } from '@/components/dashboard/page-header'
+import { StatCard } from '@/components/dashboard/stat-card'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { Card } from '@/components/ui/card'
+import { useI18n } from '@/lib/i18n/context'
+import { adminTableLabels } from '@/lib/marketing-pages'
 import { formatCurrency, formatListingType, getListingTypeColor } from '@/lib/format'
-import { Plus, Trash2, Eye, ToggleLeft, ToggleRight, ArrowLeft, ArrowRight } from 'lucide-react'
+import { Home, Eye, Trash2, ToggleLeft, ToggleRight, ArrowLeft, ArrowRight, CheckCircle } from 'lucide-react'
+import { motion, AnimatePresence } from 'motion/react'
 
 interface Listing {
   id: string
@@ -23,24 +37,29 @@ interface Listing {
 export default function AdminListingsPage() {
   const router = useRouter()
   const { data: session, status: authStatus } = useSession()
+  const { t, locale } = useI18n()
+  const labels = adminTableLabels[locale]
   const [listings, setListings] = useState<Listing[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
-  
-  // Pagination
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const [activeCount, setActiveCount] = useState(0)
   const limit = 10
-
-  // Interaction states
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [togglingId, setTogglingId] = useState<string | null>(null)
 
   useEffect(() => {
-    if (authStatus === 'unauthenticated') { router.push('/auth/signin'); return }
+    if (authStatus === 'unauthenticated') {
+      router.push('/auth/signin')
+      return
+    }
     if (authStatus === 'authenticated') {
-      const role = (session?.user as any)?.role
-      if (role !== 'ADMIN') { router.push('/dashboard'); return }
+      const role = session?.user?.role
+      if (role !== 'ADMIN') {
+        router.push('/dashboard')
+      }
     }
   }, [authStatus, session, router])
 
@@ -51,27 +70,34 @@ export default function AdminListingsPage() {
       try {
         const res = await fetch(`/api/listings?page=${page}&limit=${limit}`)
         const data = await res.json()
-        setListings(data.listings ?? [])
+        const items: Listing[] = data.listings ?? []
+        setListings(items)
+        setTotalCount(data.pagination?.total ?? 0)
         setTotalPages(Math.ceil((data.pagination?.total ?? 0) / limit) || 1)
-      } catch (err) {
-        console.error('Failed to fetch listings:', err)
+        setActiveCount(items.filter((l) => l.isActive).length)
+      } catch {
+        setError(t.auth.errors.generic)
       } finally {
         setIsLoading(false)
       }
     }
     fetchListings()
-  }, [authStatus, page])
+  }, [authStatus, page, t.auth.errors.generic])
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Supprimer cette annonce définitivement ? Cette action est irréversible.')) return
+    if (!confirm(t.admin.confirmDelete)) return
     setDeletingId(id)
     setError('')
     try {
       const res = await fetch(`/api/listings/${id}`, { method: 'DELETE' })
       if (!res.ok) throw new Error((await res.json()).error)
-      setListings(prev => prev.filter(l => l.id !== id))
-    } catch (e) { setError((e as Error).message) }
-    finally { setDeletingId(null) }
+      setListings((prev) => prev.filter((l) => l.id !== id))
+      setTotalCount((c) => c - 1)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setDeletingId(null)
+    }
   }
 
   const handleToggleActive = async (id: string, currentStatus: boolean) => {
@@ -84,81 +110,147 @@ export default function AdminListingsPage() {
         body: JSON.stringify({ isActive: !currentStatus }),
       })
       if (!res.ok) throw new Error((await res.json()).error)
-      setListings(prev => prev.map(l => l.id === id ? { ...l, isActive: !currentStatus } : l))
-    } catch (e) { setError((e as Error).message) }
-    finally { setTogglingId(null) }
+      setListings((prev) =>
+        prev.map((l) => (l.id === id ? { ...l, isActive: !currentStatus } : l))
+      )
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setTogglingId(null)
+    }
   }
 
   return (
-    <>
-      <Navbar />
-      <main className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 pt-24 pb-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+    <PageShell>
+      <div className="mx-auto max-w-7xl space-y-8 px-4 py-10 sm:px-6 lg:px-8">
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
+          <PageHeader
+            title={t.admin.listingsTitle}
+            description={t.admin.manageAllListingsDesc}
+            backHref="/admin/dashboard"
+            backLabel={t.admin.dashboardTitle}
+            action={{ label: t.admin.createListing, href: '/admin/listings/create' }}
+          />
+        </motion.div>
 
-          <Link href="/admin/dashboard" className="flex items-center gap-2 text-slate-400 hover:text-white text-sm transition-colors">
-            <ArrowLeft className="w-4 h-4" /> Tableau de bord Admin
-          </Link>
+        <motion.div 
+          className="grid grid-cols-2 gap-4 md:grid-cols-3"
+          initial="hidden"
+          animate="show"
+          variants={{
+            hidden: { opacity: 0 },
+            show: { opacity: 1, transition: { staggerChildren: 0.1 } }
+          }}
+        >
+          <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }}>
+            <StatCard icon={Home} value={totalCount} label={t.admin.listings} />
+          </motion.div>
+          <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }}>
+            <StatCard
+              icon={CheckCircle}
+              value={activeCount}
+              label={labels.active}
+              badge={{ text: t.admin.active, positive: true }}
+            />
+          </motion.div>
+          <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="col-span-2 md:col-span-1">
+            <StatCard
+              icon={Home}
+              value={totalCount - activeCount}
+              label={t.listing.inactive}
+            />
+          </motion.div>
+        </motion.div>
 
-          <div className="flex justify-between items-center mb-8 flex-wrap gap-4">
-            <div>
-              <h1 className="text-3xl font-bold text-white mb-2">Gestion des Annonces</h1>
-              <p className="text-slate-400">Modérez et gérez toutes les annonces de la plateforme</p>
-            </div>
-            {/* Create feature for admin exists in landlord flow mostly, but keeping the button */}
+        {error && (
+          <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+            {error}
           </div>
+        )}
 
-          {error && <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-red-300 text-sm">{error}</div>}
-
-          <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-white/10 bg-white/5">
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-white">Titre</th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-white">Type</th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-white">Créateur</th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-white">Prix/Jour</th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-white">Statut</th>
-                    <th className="px-6 py-4 text-right text-sm font-semibold text-white">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {isLoading ? (
-                    <tr>
-                      <td colSpan={6} className="px-6 py-12 text-center">
-                        <div className="flex justify-center"><div className="w-8 h-8 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin" /></div>
-                      </td>
-                    </tr>
-                  ) : listings.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
-                        Aucune annonce trouvée.
-                      </td>
-                    </tr>
-                  ) : (
-                    listings.map((listing) => (
-                      <tr key={listing.id} className={`hover:bg-white/5 transition-colors ${!listing.isActive ? 'opacity-70' : ''}`}>
-                        <td className="px-6 py-4">
-                          <p className="text-white font-medium truncate max-w-[200px]">{listing.title}</p>
-                          <p className="text-slate-500 text-xs truncate max-w-[200px]">{listing.location}</p>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className={`text-xs px-2 py-1 rounded-full border ${getListingTypeColor(listing.type)}`}>
-                            {formatListingType(listing.type)}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <Card className="overflow-hidden py-0">
+            {isLoading ? (
+            <div className="space-y-3 p-6">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-12 w-full rounded-lg" />
+              ))}
+            </div>
+          ) : (
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="px-6">{labels.title}</TableHead>
+                    <TableHead className="px-6">{labels.type}</TableHead>
+                    <TableHead className="px-6">{t.admin.host}</TableHead>
+                    <TableHead className="px-6">{labels.pricePerDay}</TableHead>
+                    <TableHead className="px-6">{labels.status}</TableHead>
+                    <TableHead className="px-6 text-right">{labels.actions}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <AnimatePresence mode="popLayout">
+                    {listings.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
+                          {labels.noResults}
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      listings.map((listing) => (
+                        <motion.tr
+                          key={listing.id}
+                          layout
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, x: -10 }}
+                          className={`border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted ${!listing.isActive ? 'opacity-60' : ''}`}
+                        >
+                          <TableCell className="px-6">
+                          <p className="max-w-[200px] truncate font-medium">{listing.title}</p>
+                          <p className="max-w-[200px] truncate text-xs text-muted-foreground">
+                            {listing.location}
+                          </p>
+                        </TableCell>
+                        <TableCell className="px-6">
+                          <span
+                            className={`rounded-full border px-2 py-0.5 text-xs ${getListingTypeColor(listing.type)}`}
+                          >
+                            {formatListingType(listing.type, locale)}
                           </span>
-                        </td>
-                        <td className="px-6 py-4 text-slate-300 text-sm">{listing.landlord.name ?? '—'}</td>
-                        <td className="px-6 py-4 text-emerald-400 font-mono">{formatCurrency(listing.pricePerDay)}</td>
-                        <td className="px-6 py-4">
-                          <span className={`text-xs px-2 py-1 rounded-full border ${listing.isActive ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-red-500/20 text-red-300 border-red-500/40'}`}>
-                            {listing.isActive ? 'Active' : 'Inactive'}
+                        </TableCell>
+                        <TableCell className="px-6 text-muted-foreground">
+                          {listing.landlord.name ?? '—'}
+                        </TableCell>
+                        <TableCell className="px-6 font-medium tabular-nums">
+                          {formatCurrency(listing.pricePerDay, locale)}
+                        </TableCell>
+                        <TableCell className="px-6">
+                          <span
+                            className={`rounded-full border px-2 py-0.5 text-xs ${
+                              listing.isActive
+                                ? 'border-emerald-200 bg-emerald-100 text-emerald-800'
+                                : 'border-red-200 bg-red-100 text-red-800'
+                            }`}
+                          >
+                            {listing.isActive ? labels.active : t.listing.inactive}
                           </span>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="flex items-center justify-end gap-2">
+                        </TableCell>
+                        <TableCell className="px-6 text-right">
+                          <div className="flex items-center justify-end gap-1">
                             <Link href={`/listings/${listing.id}`} target="_blank">
-                              <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-blue-400 hover:text-blue-300 hover:bg-blue-500/20" title="Voir">
-                                <Eye className="w-4 h-4" />
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="size-8 p-0"
+                                title={labels.view}
+                              >
+                                <Eye className="size-4" />
                               </Button>
                             </Link>
                             <Button
@@ -166,59 +258,66 @@ export default function AdminListingsPage() {
                               variant="ghost"
                               onClick={() => handleToggleActive(listing.id, listing.isActive)}
                               disabled={togglingId === listing.id}
-                              className={`h-8 w-8 p-0 ${listing.isActive ? 'text-amber-400 hover:text-amber-300 hover:bg-amber-500/20' : 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/20'}`}
-                              title={listing.isActive ? 'Désactiver' : 'Activer'}
+                              className="size-8 p-0"
+                              title={listing.isActive ? t.listing.deactivate : t.listing.activate}
                             >
-                              {listing.isActive ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
+                              {listing.isActive ? (
+                                <ToggleRight className="size-4" />
+                              ) : (
+                                <ToggleLeft className="size-4" />
+                              )}
                             </Button>
                             <Button
                               size="sm"
                               variant="ghost"
                               onClick={() => handleDelete(listing.id)}
                               disabled={deletingId === listing.id}
-                              className="h-8 w-8 p-0 text-red-400 hover:text-red-300 hover:bg-red-500/20"
-                              title="Supprimer"
+                              className="size-8 p-0 text-destructive hover:text-destructive"
+                              title={t.common.delete}
                             >
-                              <Trash2 className="w-4 h-4" />
+                              <Trash2 className="size-4" />
                             </Button>
                           </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-            
-            {/* Pagination Controls */}
-            {totalPages > 1 && (
-              <div className="px-6 py-4 border-t border-white/5 flex items-center justify-between">
-                <p className="text-sm text-slate-400">Page {page} sur {totalPages}</p>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setPage(p => Math.max(1, p - 1))}
-                    disabled={page === 1 || isLoading}
-                    className="border-white/10 text-slate-300 hover:bg-white/10 hover:text-white"
-                  >
-                    <ArrowLeft className="w-4 h-4 mr-1" /> Précédent
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                    disabled={page === totalPages || isLoading}
-                    className="border-white/10 text-slate-300 hover:bg-white/10 hover:text-white"
-                  >
-                    Suivant <ArrowRight className="w-4 h-4 ml-1" />
-                  </Button>
+                          </TableCell>
+                        </motion.tr>
+                      ))
+                    )}
+                  </AnimatePresence>
+                </TableBody>
+              </Table>
+
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between border-t px-6 py-4">
+                  <p className="text-sm text-muted-foreground">
+                    {labels.page} {page} {labels.of} {totalPages}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={page === 1 || isLoading}
+                    >
+                      <ArrowLeft className="mr-1 size-4" />
+                      {labels.previous}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={page === totalPages || isLoading}
+                    >
+                      {labels.next}
+                      <ArrowRight className="ml-1 size-4" />
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </main>
-    </>
+              )}
+            </>
+          )}
+        </Card>
+        </motion.div>
+      </div>
+    </PageShell>
   )
 }
