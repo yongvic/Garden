@@ -51,16 +51,28 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
   callbacks: {
     ...authConfig.callbacks,
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id
-        // Fetch the role from database for JWT token
+      }
+
+      // Always refresh role from DB so promotions (e.g. ADMIN) take effect without re-login
+      if (token.id) {
         const dbUser = await prisma.user.findUnique({
-          where: { id: user.id },
+          where: { id: token.id as string },
           select: { role: true },
         })
-        token.role = dbUser?.role || Role.CUSTOMER
+        if (dbUser) {
+          token.role = dbUser.role
+        }
+      } else if (user) {
+        token.role = (user as { role?: Role }).role ?? Role.CUSTOMER
       }
+
+      if (trigger === "update" && session) {
+        token = { ...token, ...session }
+      }
+
       return token
     },
   }

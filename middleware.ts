@@ -26,9 +26,8 @@ export default auth((req) => {
     return NextResponse.redirect(signInUrl)
   }
 
-  if (nextUrl.pathname.startsWith("/admin") && req.auth?.user?.role !== "ADMIN") {
-    return NextResponse.redirect(new URL("/", nextUrl.origin))
-  }
+  // Admin role is enforced server-side (requireAdmin) with a fresh DB lookup.
+  // Middleware JWT can be stale after a role change in the database.
 
   if (nextUrl.pathname.startsWith("/landlord") && req.auth?.user?.role !== "LANDLORD" && req.auth?.user?.role !== "ADMIN") {
     return NextResponse.redirect(new URL("/dashboard", nextUrl.origin))

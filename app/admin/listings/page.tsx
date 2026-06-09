@@ -36,7 +36,7 @@ interface Listing {
 
 export default function AdminListingsPage() {
   const router = useRouter()
-  const { data: session, status: authStatus } = useSession()
+  const { status: authStatus } = useSession()
   const { t, locale } = useI18n()
   const labels = adminTableLabels[locale]
   const [listings, setListings] = useState<Listing[]>([])
@@ -56,12 +56,16 @@ export default function AdminListingsPage() {
       return
     }
     if (authStatus === 'authenticated') {
-      const role = session?.user?.role
-      if (role !== 'ADMIN') {
-        router.push('/dashboard')
-      }
+      fetch('/api/users/me')
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.role !== 'ADMIN') {
+            router.push('/dashboard')
+          }
+        })
+        .catch(() => router.push('/dashboard'))
     }
-  }, [authStatus, session, router])
+  }, [authStatus, router])
 
   useEffect(() => {
     if (authStatus !== 'authenticated') return
