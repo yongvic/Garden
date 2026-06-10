@@ -3,6 +3,7 @@ import { Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 import bcrypt from "bcryptjs";
 import 'dotenv/config';
+import { resolveGeoFromLocation } from "../lib/geo";
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
@@ -319,8 +320,15 @@ async function main() {
 
     const createdListings = [];
     for (const listing of listingsData) {
+      const geo = resolveGeoFromLocation(listing.location);
       const created = await prisma.listing.create({
-        data: listing
+        data: {
+          ...listing,
+          latitude: geo?.latitude,
+          longitude: geo?.longitude,
+          citySlug: geo?.citySlug,
+          neighborhood: geo?.neighborhood,
+        },
       });
       createdListings.push(created);
     }

@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma"
 import { auth } from "@/auth"
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
-import { citySlugFromLocation } from "@/lib/slug"
+import { resolveGeoFromLocation } from "@/lib/geo"
 
 const createListingSchema = z.object({
   title: z.string({ required_error: "Le titre est requis" }).min(5, "Le titre doit faire au moins 5 caractères"),
@@ -50,11 +50,16 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const validatedData = createListingSchema.parse(body)
 
+    const geo = resolveGeoFromLocation(validatedData.location)
+
     const listing = await prisma.listing.create({
       data: {
         ...validatedData,
         landlordId: session.user.id,
-        citySlug: citySlugFromLocation(validatedData.location),
+        latitude: validatedData.latitude ?? geo?.latitude,
+        longitude: validatedData.longitude ?? geo?.longitude,
+        citySlug: geo?.citySlug,
+        neighborhood: geo?.neighborhood,
       },
     })
 

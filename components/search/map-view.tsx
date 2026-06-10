@@ -2,6 +2,8 @@
 
 import dynamic from 'next/dynamic'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useI18n } from '@/lib/i18n/context'
+import { enrichListingGeo } from '@/lib/geo'
 import type { ListingCardData } from '@/components/listing-card'
 
 export type MapListing = ListingCardData & {
@@ -24,14 +26,16 @@ const MapViewInner = dynamic(
 )
 
 export function MapView({ listings, className }: MapViewProps) {
-  const withCoords = listings.filter(
-    (l) => l.latitude != null && l.longitude != null
-  )
+  const { t } = useI18n()
+
+  const withCoords = listings
+    .map((l) => enrichListingGeo(l as MapListing))
+    .filter((l) => l.latitude != null && l.longitude != null)
 
   if (withCoords.length === 0) {
     return (
-      <div className="flex h-[480px] items-center justify-center rounded-2xl border border-dashed border-border text-sm text-muted-foreground">
-        No map coordinates available
+      <div className="flex h-[480px] items-center justify-center rounded-2xl border border-dashed border-border px-6 text-center text-sm text-muted-foreground">
+        {t.search.noMapCoordinates}
       </div>
     )
   }

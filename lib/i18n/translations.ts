@@ -104,6 +104,7 @@ const fr = {
     cityTitle: 'Espaces à',
     citySubtitle: 'Découvrez les espaces professionnels disponibles à',
     cityEmpty: 'Aucun espace disponible dans cette ville pour le moment.',
+    noMapCoordinates: 'Aucune coordonnée carte pour ces annonces. Essayez une autre ville.',
   },
   calendar: {
     title: 'Calendrier de disponibilité',
@@ -617,6 +618,7 @@ const en: typeof fr = {
     cityTitle: 'Spaces in',
     citySubtitle: 'Discover professional spaces available in',
     cityEmpty: 'No spaces available in this city yet.',
+    noMapCoordinates: 'No map coordinates for these listings. Try another city.',
   },
   calendar: {
     title: 'Availability calendar',
