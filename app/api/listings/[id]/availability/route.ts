@@ -32,7 +32,7 @@ export async function GET(
         prisma.booking.findFirst({
           where: {
             listingId: id,
-            status: { in: ["CONFIRMED", "IN_PROGRESS"] },
+            status: { in: ["PENDING", "CONFIRMED", "IN_PROGRESS"] },
             OR: [
               {
                 checkInDate: { lt: checkOut },
@@ -65,7 +65,7 @@ export async function GET(
     const confirmedBookings = await prisma.booking.findMany({
       where: {
         listingId: id,
-        status: { in: ["CONFIRMED", "IN_PROGRESS"] },
+        status: { in: ["PENDING", "CONFIRMED", "IN_PROGRESS"] },
       },
       select: {
         checkInDate: true,

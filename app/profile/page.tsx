@@ -19,7 +19,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useI18n } from '@/lib/i18n/context'
 import { formatDate } from '@/lib/format'
 import { toast } from 'sonner'
-import { Camera, Loader2, Shield, User, Lock } from 'lucide-react'
+import { Camera, Loader2, Shield, User, Lock, Gift, Star } from 'lucide-react'
 import { motion } from 'motion/react'
 
 interface UserProfile {
@@ -45,6 +45,8 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
+  const [loyalty, setLoyalty] = useState<{ points: number; totalBookings: number } | null>(null)
+  const [referralCode, setReferralCode] = useState<string | null>(null)
   const avatarInputRef = useRef<HTMLInputElement>(null)
 
   const profileForm = useForm<ProfileValues>({ resolver: zodResolver(profileSchema), defaultValues: { name: '', phone: '' } })
@@ -64,8 +66,23 @@ export default function ProfilePage() {
         })
         .catch(() => toast.error(t.common.error))
         .finally(() => setIsLoading(false))
+
+      Promise.all([
+        fetch('/api/loyalty').then((r) => (r.ok ? r.json() : null)),
+        fetch('/api/referral').then((r) => (r.ok ? r.json() : null)),
+      ])
+        .then(([loyaltyData, referralData]) => {
+          if (loyaltyData?.account) {
+            setLoyalty({
+              points: loyaltyData.account.points,
+              totalBookings: loyaltyData.account.totalBookings,
+            })
+          }
+          if (referralData?.code) setReferralCode(referralData.code)
+        })
+        .catch(() => {})
     }
-  }, [authStatus, router])
+  }, [authStatus, router, t.common.error])
 
   const dashboardHref = profile?.role === 'LANDLORD' ? '/landlord/dashboard' : profile?.role === 'ADMIN' ? '/admin/dashboard' : '/dashboard'
 
@@ -194,6 +211,62 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
         </motion.div>
+
+        {(loyalty || referralCode) && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.05 }}
+          >
+            <div className="grid gap-4 sm:grid-cols-2">
+              {loyalty && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <Star className="size-4" /> {t.profile.loyaltyTitle}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">{t.profile.loyaltyPoints}</span>
+                      <span className="font-semibold tabular-nums">{loyalty.points}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">{t.profile.loyaltyBookings}</span>
+                      <span className="font-semibold tabular-nums">{loyalty.totalBookings}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground pt-1">{t.profile.loyaltyHint}</p>
+                  </CardContent>
+                </Card>
+              )}
+              {referralCode && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <Gift className="size-4" /> {t.profile.referralTitle}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div>
+                      <p className="text-xs text-muted-foreground">{t.profile.referralCode}</p>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await navigator.clipboard.writeText(referralCode)
+                          toast.success(t.profile.referralCopied)
+                        }}
+                        className="mt-1 font-mono text-lg font-semibold tracking-wider text-primary hover:underline"
+                      >
+                        {referralCode}
+                      </button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{t.profile.referralHint}</p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </motion.div>
+        )}
 
         <motion.div 
           initial={{ opacity: 0, y: 20 }}

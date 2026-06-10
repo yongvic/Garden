@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { createInvoicesForBooking } from "@/lib/invoices"
 import Stripe from "stripe"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
@@ -81,6 +82,17 @@ export async function POST(req: NextRequest) {
               message: `New booking confirmed for ${booking.listing.title}`,
             },
           })
+
+          const existingInvoice = await prisma.invoice.findFirst({
+            where: { bookingId },
+          })
+          if (!existingInvoice) {
+            try {
+              await createInvoicesForBooking(bookingId)
+            } catch (err) {
+              console.error("Invoice generation failed:", err)
+            }
+          }
         }
 
         break

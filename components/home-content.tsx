@@ -26,12 +26,12 @@ type HomeStats = {
 
 const FADE_UP = {
   hidden: { opacity: 0, y: 24 },
-  show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
+  show: { opacity: 1, y: 0, transition: { type: 'spring' as const, stiffness: 300, damping: 24 } },
 }
 
 const STAGGER = {
   hidden: { opacity: 0 },
-  show: { opacity: 1, transition: { staggerChildren: 0.1 } }
+  show: { opacity: 1, transition: { staggerChildren: 0.1 } },
 }
 
 export function HomeContent({ stats }: { stats: HomeStats }) {

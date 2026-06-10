@@ -18,15 +18,22 @@ import {
 import { toast } from 'sonner'
 import {
   MapPin, Calendar, Users, CheckCircle, Clock, XCircle,
-  AlertTriangle, Home, CreditCard,
+  AlertTriangle, Home, Smartphone,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { motion } from 'motion/react'
+import { ChatPanel } from '@/components/booking/chat-panel'
+import { CheckInCard } from '@/components/booking/check-in-card'
+import { FileDown } from 'lucide-react'
+import { MobileMoneyDialog } from '@/components/payment/mobile-money-dialog'
 
 interface BookingDetail {
   id: string; bookingNumber: string; status: string
   checkInDate: string; checkOutDate: string; numberOfGuests: number
   specialRequests: string | null; totalPrice: number; paymentStatus: string
+  checkInInstructions?: string | null
+  accessCode?: string | null
+  checkInQrToken?: string | null
   listing: {
     id: string; title: string; location: string; images: string[]
     pricePerDay: number; landlordId: string
@@ -84,7 +91,8 @@ export default function BookingDetailPage() {
   const [booking, setBooking] = useState<BookingDetail | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isCancelling, setIsCancelling] = useState(false)
-  const [isPaying, setIsPaying] = useState(false)
+  const [paymentOpen, setPaymentOpen] = useState(false)
+  const [isDownloadingInvoice, setIsDownloadingInvoice] = useState(false)
 
   useEffect(() => {
     if (authStatus === 'unauthenticated') { router.push('/auth/signin'); return }
@@ -116,23 +124,39 @@ export default function BookingDetailPage() {
     }
   }
 
-  const handlePay = async () => {
+  const handleDownloadInvoice = async () => {
     if (!booking) return
-    setIsPaying(true)
+    setIsDownloadingInvoice(true)
     try {
-      const res = await fetch('/api/payments/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bookingId: booking.id }),
-      })
-      const data = await res.json()
+      let res = await fetch(`/api/bookings/${booking.id}/invoices`)
+      let data = await res.json()
       if (!res.ok) throw new Error(data.error)
-      if (data.url) window.location.href = data.url
+
+      let invoiceId = data.invoices?.find((i: { type: string }) => i.type === 'CLIENT')?.id
+        ?? data.invoices?.[0]?.id
+
+      if (!invoiceId) {
+        res = await fetch(`/api/bookings/${booking.id}/invoices`, { method: 'POST' })
+        data = await res.json()
+        if (!res.ok) throw new Error(data.error)
+        invoiceId = data.clientInvoice?.id
+      }
+
+      if (!invoiceId) throw new Error('Invoice not available')
+      window.open(`/api/invoices/${invoiceId}/pdf`, '_blank')
     } catch (e) {
       toast.error((e as Error).message)
     } finally {
-      setIsPaying(false)
+      setIsDownloadingInvoice(false)
     }
+  }
+
+  const refreshBooking = () => {
+    if (!params.id) return
+    fetch(`/api/bookings/${params.id}`)
+      .then(async (r) => { if (!r.ok) throw new Error((await r.json()).error); return r.json() })
+      .then(setBooking)
+      .catch((e) => toast.error(e.message))
   }
 
   if (isLoading) {
@@ -234,6 +258,19 @@ export default function BookingDetailPage() {
               </Card>
             )}
 
+            {['CONFIRMED', 'IN_PROGRESS', 'COMPLETED'].includes(booking.status) && (
+              <CheckInCard
+                bookingId={booking.id}
+                instructions={booking.checkInInstructions}
+                accessCode={booking.accessCode}
+                checkInQrToken={booking.checkInQrToken}
+                checkInDate={booking.checkInDate}
+                bookingNumber={booking.bookingNumber}
+              />
+            )}
+
+            <ChatPanel bookingId={booking.id} />
+
             {booking.listing.images[0] && (
               <Card className="overflow-hidden">
                 <img src={booking.listing.images[0]} alt="" className="h-48 w-full object-cover" />
@@ -293,9 +330,21 @@ export default function BookingDetailPage() {
             </Card>
 
             {canPay && (
-              <Button className="w-full gap-2" onClick={handlePay} disabled={isPaying}>
-                <CreditCard className="size-4" />
-                {isPaying ? t.common.loading : t.bookings.pay}
+              <Button className="w-full gap-2" onClick={() => setPaymentOpen(true)}>
+                <Smartphone className="size-4" />
+                {t.bookings.pay}
+              </Button>
+            )}
+
+            {['CONFIRMED', 'IN_PROGRESS', 'COMPLETED'].includes(booking.status) && (
+              <Button
+                variant="outline"
+                className="w-full gap-2"
+                onClick={handleDownloadInvoice}
+                disabled={isDownloadingInvoice}
+              >
+                <FileDown className="size-4" />
+                {isDownloadingInvoice ? t.common.loading : t.bookings.downloadInvoice}
               </Button>
             )}
 
@@ -312,6 +361,14 @@ export default function BookingDetailPage() {
           </motion.div>
         </div>
       </div>
+
+      <MobileMoneyDialog
+        bookingId={booking.id}
+        amount={guestTotal}
+        open={paymentOpen}
+        onOpenChange={setPaymentOpen}
+        onSuccess={refreshBooking}
+      />
     </PageShell>
   )
 }

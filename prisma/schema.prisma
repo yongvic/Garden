@@ -32,6 +32,20 @@ model User {
   damageClaims          DamageClaim[]
   notifications         Notification[]
   favorites             Favorite[]
+  sentMessages          Message[]
+  conversationsAsCustomer Conversation[] @relation("CustomerConversations")
+  conversationsAsLandlord Conversation[] @relation("LandlordConversations")
+  invoices              Invoice[]
+  quoteRequests         QuoteRequest[]
+  hostReviewsGiven      HostReview[]     @relation("HostReviews")
+  hostReviewsReceived   HostReview[]     @relation("GuestReviews")
+  loyaltyAccount        LoyaltyAccount?
+  referralCode          ReferralCode?
+  referralsMade         Referral[]         @relation("Referrer")
+  referralsReceived     Referral[]         @relation("Referred")
+  sharedFavoriteLists   SharedFavoriteList[]
+  landlordOnboarding    LandlordOnboarding?
+  modificationRequests  BookingModificationRequest[] @relation("ModificationRequester")
 
   @@index([email])
 }
@@ -103,6 +117,48 @@ enum DamageStatus {
   SETTLED
 }
 
+enum BookingMode {
+  INSTANT
+  REQUEST
+}
+
+enum BookingPricingType {
+  DAILY
+  HOURLY
+}
+
+enum PricingRuleType {
+  WEEKEND
+  SEASON
+  LONG_STAY
+}
+
+enum InvoiceType {
+  CLIENT
+  HOST
+}
+
+enum QuoteStatus {
+  PENDING
+  QUOTED
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+enum ModificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum EventPackageType {
+  WEDDING
+  CONFERENCE
+  FILMING
+  OTHER
+}
+
 model Listing {
   id                  String       @id @default(cuid())
   title               String
@@ -123,6 +179,18 @@ model Listing {
   
   isActive            Boolean      @default(true)
   viewCount           Int          @default(0)
+
+  bookingMode         BookingMode  @default(REQUEST)
+  minNights           Int          @default(1)
+  maxNights           Int?
+  advanceNoticeDays   Int          @default(0)
+  checkInTime         String?      @default("15:00")
+  checkOutTime        String?      @default("11:00")
+  hourlyBookingEnabled Boolean     @default(false)
+  pricePerHour        Float?
+  citySlug            String?
+  neighborhood        String?
+
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt
 
@@ -131,10 +199,15 @@ model Listing {
   reviews             Review[]
   unavailableDates    UnavailableDate[]
   favorites           Favorite[]
+  pricingRules        PricingRule[]
+  eventPackages       EventPackage[]
+  quoteRequests       QuoteRequest[]
 
   @@index([landlordId])
   @@index([type])
   @@index([isActive])
+  @@index([citySlug])
+  @@index([latitude, longitude])
 }
 
 model Favorite {
@@ -185,6 +258,20 @@ model Booking {
   
   paymentId           String?        // Stripe payment intent ID
   paymentStatus       String         @default("pending")
+
+  pricingType         BookingPricingType @default(DAILY)
+  startTime           String?
+  endTime             String?
+  packageId           String?
+  package             EventPackage?  @relation(fields: [packageId], references: [id], onDelete: SetNull)
+  quoteId             String?        @unique
+  quote               QuoteRequest?  @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+
+  checkInInstructions String?        @db.Text
+  accessCode          String?
+  checkInQrToken      String?        @unique
+  loyaltyDiscount     Float          @default(0)
+  referralCredit      Float          @default(0)
   
   createdAt           DateTime       @default(now())
   updatedAt           DateTime     @updatedAt
@@ -192,8 +279,11 @@ model Booking {
   // Relations
   damageClaims        DamageClaim[]
   notifications       Notification[]
+  conversation        Conversation?
+  invoices            Invoice[]
+  hostReview          HostReview?
+  modificationRequests BookingModificationRequest[]
 
-  @@unique([listingId, checkInDate, checkOutDate])
   @@index([customerId])
   @@index([listingId])
   @@index([status])
@@ -272,4 +362,224 @@ model StripeCustomer {
   userId      String   @unique
   stripeId    String   @unique
   createdAt   DateTime @default(now())
+}
+
+model PricingRule {
+  id               String          @id @default(cuid())
+  listingId        String
+  listing          Listing         @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  ruleType         PricingRuleType
+  multiplier       Float?
+  discountPercent  Float?
+  minNights        Int?
+  startDate        DateTime?
+  endDate          DateTime?
+  isActive         Boolean         @default(true)
+  createdAt        DateTime        @default(now())
+
+  @@index([listingId])
+}
+
+model EventPackage {
+  id          String           @id @default(cuid())
+  listingId   String
+  listing     Listing          @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  name        String
+  description String           @db.Text
+  packageType EventPackageType @default(OTHER)
+  basePrice   Float
+  isActive    Boolean          @default(true)
+  options     EventPackageOption[]
+  bookings    Booking[]
+  quotes      QuoteRequest[]
+  createdAt   DateTime         @default(now())
+
+  @@index([listingId])
+}
+
+model EventPackageOption {
+  id          String       @id @default(cuid())
+  packageId   String
+  package     EventPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  price       Float
+  isRequired  Boolean      @default(false)
+
+  @@index([packageId])
+}
+
+model Conversation {
+  id         String    @id @default(cuid())
+  bookingId  String    @unique
+  booking    Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  customerId String
+  customer   User      @relation("CustomerConversations", fields: [customerId], references: [id], onDelete: Cascade)
+  landlordId String
+  landlord   User      @relation("LandlordConversations", fields: [landlordId], references: [id], onDelete: Cascade)
+  messages   Message[]
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([customerId])
+  @@index([landlordId])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  content        String       @db.Text
+  readAt         DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId])
+  @@index([senderId])
+}
+
+model InvoiceSequence {
+  year       Int @id
+  lastNumber Int @default(0)
+}
+
+model Invoice {
+  id            String      @id @default(cuid())
+  invoiceNumber String      @unique
+  bookingId     String
+  booking       Booking     @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type          InvoiceType
+  subtotal      Float
+  vatRate       Float       @default(0)
+  vatAmount     Float       @default(0)
+  total         Float
+  currency      String      @default("XOF")
+  issuedAt      DateTime    @default(now())
+
+  @@index([bookingId])
+  @@index([userId])
+}
+
+model SharedFavoriteList {
+  id        String               @id @default(cuid())
+  userId    String
+  user      User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slug      String               @unique
+  title     String?
+  isPublic  Boolean              @default(true)
+  items     SharedFavoriteItem[]
+  createdAt DateTime             @default(now())
+
+  @@index([userId])
+}
+
+model SharedFavoriteItem {
+  id        String             @id @default(cuid())
+  listId    String
+  list      SharedFavoriteList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  listingId String
+  addedAt   DateTime           @default(now())
+
+  @@unique([listId, listingId])
+}
+
+model QuoteRequest {
+  id          String      @id @default(cuid())
+  listingId   String
+  listing     Listing     @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  customerId  String
+  customer    User        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  packageId   String?
+  package     EventPackage? @relation(fields: [packageId], references: [id], onDelete: SetNull)
+  eventType   String
+  eventDate   DateTime
+  guests      Int
+  message     String      @db.Text
+  status      QuoteStatus @default(PENDING)
+  quotedPrice Float?
+  hostReply   String?     @db.Text
+  booking     Booking?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([listingId])
+  @@index([customerId])
+}
+
+model BookingModificationRequest {
+  id            String             @id @default(cuid())
+  bookingId     String
+  booking       Booking            @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  requestedById String
+  requestedBy   User               @relation("ModificationRequester", fields: [requestedById], references: [id], onDelete: Cascade)
+  newCheckIn    DateTime
+  newCheckOut   DateTime
+  newGuests     Int?
+  status        ModificationStatus @default(PENDING)
+  hostReply     String?
+  createdAt     DateTime           @default(now())
+
+  @@index([bookingId])
+}
+
+model HostReview {
+  id         String   @id @default(cuid())
+  bookingId  String   @unique
+  booking    Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  hostId     String
+  host       User     @relation("HostReviews", fields: [hostId], references: [id], onDelete: Cascade)
+  customerId String
+  customer   User     @relation("GuestReviews", fields: [customerId], references: [id], onDelete: Cascade)
+  rating     Int
+  comment    String?  @db.Text
+  createdAt  DateTime @default(now())
+
+  @@index([hostId])
+  @@index([customerId])
+}
+
+model LoyaltyAccount {
+  id             String @id @default(cuid())
+  userId         String @unique
+  user           User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  points         Int    @default(0)
+  totalBookings  Int    @default(0)
+  updatedAt      DateTime @updatedAt
+}
+
+model ReferralCode {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  code      String   @unique
+  createdAt DateTime @default(now())
+}
+
+model Referral {
+  id              String   @id @default(cuid())
+  referrerId      String
+  referrer        User     @relation("Referrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  referredUserId  String   @unique
+  referred        User     @relation("Referred", fields: [referredUserId], references: [id], onDelete: Cascade)
+  creditAmount    Float    @default(5000)
+  redeemed        Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  @@index([referrerId])
+}
+
+model LandlordOnboarding {
+  id                   String  @id @default(cuid())
+  userId               String  @unique
+  user                 User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profileComplete      Boolean @default(false)
+  firstListingCreated  Boolean @default(false)
+  calendarConfigured   Boolean @default(false)
+  pricingConfigured    Boolean @default(false)
+  photosUploaded       Boolean @default(false)
+  completedAt          DateTime?
+  updatedAt            DateTime @updatedAt
 }

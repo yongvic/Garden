@@ -14,7 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useI18n } from '@/lib/i18n/context'
 import { formatCurrency, formatListingType, getListingTypeColor } from '@/lib/format'
 import { toast } from 'sonner'
-import { Plus, Eye, ToggleLeft, ToggleRight, Trash2, Home } from 'lucide-react'
+import { Plus, Eye, ToggleLeft, ToggleRight, Trash2, Home, Calendar } from 'lucide-react'
 import { motion, AnimatePresence } from 'motion/react'
 
 interface Listing {
@@ -185,11 +185,17 @@ export default function LandlordListingsPage() {
                     </span>
                   </p>
 
-                  <div className="flex items-center gap-2 border-t border-border pt-3">
-                    <Link href={`/listings/${listing.id}`} target="_blank" className="flex-1">
+                  <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+                    <Link href={`/listings/${listing.id}`} target="_blank" className="flex-1 min-w-[7rem]">
                       <Button size="sm" variant="outline" className="w-full gap-1 text-xs transition-transform active:scale-95">
                         <Eye className="size-3.5" />
                         {t.bookings.viewListing}
+                      </Button>
+                    </Link>
+                    <Link href={`/landlord/listings/${listing.id}/calendar`} className="flex-1 min-w-[7rem]">
+                      <Button size="sm" variant="outline" className="w-full gap-1 text-xs transition-transform active:scale-95">
+                        <Calendar className="size-3.5" />
+                        {t.calendar.title}
                       </Button>
                     </Link>
                     <Button

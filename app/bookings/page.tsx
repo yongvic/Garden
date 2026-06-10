@@ -10,8 +10,8 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useI18n } from '@/lib/i18n/context'
 import { formatCurrency, formatDateRange, getBookingStatusColor, formatBookingStatus } from '@/lib/format'
-import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'motion/react'
+import { MobileMoneyDialog } from '@/components/payment/mobile-money-dialog'
 
 interface Booking {
   id: string
@@ -37,7 +37,7 @@ export default function BookingsPage() {
   const [bookings, setBookings] = useState<Booking[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('ALL')
-  const [payingId, setPayingId] = useState<string | null>(null)
+  const [paymentTarget, setPaymentTarget] = useState<{ id: string; amount: number } | null>(null)
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -59,24 +59,6 @@ export default function BookingsPage() {
       setBookings([])
     } finally {
       setIsLoading(false)
-    }
-  }
-
-  const handlePay = async (bookingId: string) => {
-    setPayingId(bookingId)
-    try {
-      const res = await fetch('/api/payments/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bookingId }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-      if (data.url) window.location.href = data.url
-    } catch (err) {
-      toast.error((err as Error).message)
-    } finally {
-      setPayingId(null)
     }
   }
 
@@ -175,11 +157,10 @@ export default function BookingsPage() {
                   {booking.status === 'PENDING' && booking.paymentStatus === 'pending' && (
                     <Button
                       size="sm"
-                      disabled={payingId === booking.id}
-                      onClick={() => handlePay(booking.id)}
+                      onClick={() => setPaymentTarget({ id: booking.id, amount: booking.totalPrice })}
                       className="transition-transform active:scale-95"
                     >
-                      {payingId === booking.id ? t.common.loading : t.bookings.pay}
+                      {t.bookings.pay}
                     </Button>
                   )}
                 </div>
@@ -189,6 +170,14 @@ export default function BookingsPage() {
           </motion.div>
         )}
       </div>
+
+      <MobileMoneyDialog
+        bookingId={paymentTarget?.id ?? null}
+        amount={paymentTarget?.amount ?? 0}
+        open={!!paymentTarget}
+        onOpenChange={(open) => { if (!open) setPaymentTarget(null) }}
+        onSuccess={fetchBookings}
+      />
     </PageShell>
   )
 }

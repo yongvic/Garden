@@ -127,7 +127,7 @@ export default function LandlordCreateListingPage() {
       })
 
       if (!res.ok) {
-        let errMessage = t.common.error
+        let errMessage: string = t.common.error
         try {
           const json = await res.json()
           errMessage = json.error || errMessage

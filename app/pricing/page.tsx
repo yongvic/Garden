@@ -11,7 +11,7 @@ export default function PricingPage() {
 
   const guestFeatures = [
     '3% service fee on confirmed bookings',
-    'Secure card payment (XOF)',
+    'TMoney / Flooz payment (XOF)',
     '24h dispute mediation',
     'Verified reviews only',
   ]

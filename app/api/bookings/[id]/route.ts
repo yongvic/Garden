@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma"
 import { auth } from "@/auth"
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
+import { recordCompletedBooking } from "@/lib/loyalty"
 
 const updateStatusSchema = z.object({
   status: z.enum(["CONFIRMED", "CANCELLED", "COMPLETED", "IN_PROGRESS"]),
@@ -127,6 +128,10 @@ export async function PATCH(
       where: { id },
       data: { status },
     })
+
+    if (status === "COMPLETED" && booking.status !== "COMPLETED") {
+      await recordCompletedBooking(booking.customerId)
+    }
 
     // Create notification for relevant party
     const notifyUserId =

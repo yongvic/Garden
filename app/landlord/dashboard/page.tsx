@@ -32,6 +32,7 @@ import {
   User,
   AlertTriangle,
 } from 'lucide-react'
+import { OnboardingChecklist } from '@/components/landlord/onboarding-checklist'
 
 interface LandlordStats {
   listings: { total: number; active: number }
@@ -265,6 +266,8 @@ export default function LandlordDashboardPage() {
           </Card>
 
           <div className="space-y-4">
+            <OnboardingChecklist />
+
             <h2 className="px-1 font-semibold">{t.landlord.quickActions}</h2>
             {quickActions.map((action) => (
               <Link key={action.href} href={action.href}>

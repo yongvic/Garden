@@ -8,13 +8,34 @@ import { ListingCard, type ListingCardData } from '@/components/listing-card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useI18n } from '@/lib/i18n/context'
-import { Heart } from 'lucide-react'
+import { Heart, Share2 } from 'lucide-react'
+import { toast } from 'sonner'
 
 export default function FavoritesPage() {
   const { data: session, status } = useSession()
   const { t } = useI18n()
   const [listings, setListings] = useState<ListingCardData[]>([])
   const [loading, setLoading] = useState(true)
+  const [sharing, setSharing] = useState(false)
+
+  const handleShare = async () => {
+    setSharing(true)
+    try {
+      const res = await fetch('/api/favorites/share', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      await navigator.clipboard.writeText(data.url)
+      toast.success(t.listing.linkCopied)
+    } catch (e) {
+      toast.error((e as Error).message)
+    } finally {
+      setSharing(false)
+    }
+  }
 
   useEffect(() => {
     if (status !== 'authenticated') {
@@ -33,7 +54,15 @@ export default function FavoritesPage() {
   return (
     <PageShell>
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-        <h1 className="font-display text-3xl tracking-tight">{t.favorites.title}</h1>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <h1 className="font-display text-3xl tracking-tight">{t.favorites.title}</h1>
+          {listings.length > 0 && status === 'authenticated' && (
+            <Button variant="outline" className="gap-2" onClick={handleShare} disabled={sharing}>
+              <Share2 className="size-4" />
+              {sharing ? t.common.loading : t.share.title}
+            </Button>
+          )}
+        </div>
 
         {loading ? (
           <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
